@@ -1,0 +1,16 @@
+.env
+.env.local
+.env*.local
+backend/.env
+web/.env.local
+node_modules/
+web/node_modules/
+web/.next/
+web/out/
+.next/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/

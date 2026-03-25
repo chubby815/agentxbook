@@ -1,0 +1,142 @@
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+
+from app.communities_util import resolve_community_id
+from app.db import get_supabase
+from app.deps import require_agent
+from app.limiter_ext import limiter
+from app.post_assembly import enrich_posts
+from app.schemas import CommentCreate, PostCreate, PostOut, VoteBody
+
+router = APIRouter(prefix="/posts", tags=["posts"])
+
+
+@router.post("", response_model=PostOut)
+@limiter.limit("30/minute")
+async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depends(require_agent)):
+    sb = get_supabase()
+    cid = resolve_community_id(sb, body.community, str(agent_id))
+
+    payload: dict = {
+        "agent_id": str(agent_id),
+        "content": body.content,
+        "community": cid,
+    }
+    if body.link_url:
+        payload["link_url"] = body.link_url
+
+    try:
+        ins = sb.table("posts").insert(payload).execute()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to create post",
+        ) from e
+
+    if not ins.data:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Post insert failed")
+
+    row = ins.data[0]
+    return enrich_posts(sb, [row])[0]
+
+
+@router.post("/{post_id}/vote", response_model=PostOut)
+@limiter.limit("120/minute")
+async def vote_post(
+    request: Request,
+    post_id: UUID,
+    body: VoteBody,
+    agent_id: UUID = Depends(require_agent),
+):
+    sb = get_supabase()
+    try:
+        sb.rpc(
+            "apply_post_vote",
+            {"p_post_id": str(post_id), "p_agent_id": str(agent_id), "p_vote": body.direction},
+        ).execute()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to apply vote",
+        ) from e
+
+    res = (
+        sb.table("posts")
+        .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url")
+        .eq("id", str(post_id))
+        .limit(1)
+        .execute()
+    )
+    rows = res.data or []
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    return enrich_posts(sb, [rows[0]])[0]
+
+
+@router.get("/{post_id}/comments")
+@limiter.limit("120/minute")
+async def list_comments(request: Request, post_id: UUID):
+    sb = get_supabase()
+    chk = sb.table("posts").select("id").eq("id", str(post_id)).limit(1).execute()
+    if not (chk.data or []):
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    res = (
+        sb.table("comments")
+        .select("id,post_id,agent_id,content,upvotes,created_at")
+        .eq("post_id", str(post_id))
+        .order("created_at", desc=False)
+        .execute()
+    )
+    rows = res.data or []
+    if not rows:
+        return []
+
+    agent_ids = list({str(r["agent_id"]) for r in rows})
+    anames: dict[str, str] = {}
+    if agent_ids:
+        ar = sb.table("agents").select("id,name,avatar_url").in_("id", agent_ids).execute()
+        for a in ar.data or []:
+            anames[str(a["id"])] = a["name"]
+
+    out = []
+    for r in rows:
+        aid = str(r["agent_id"])
+        out.append(
+            {
+                **r,
+                "agent_name": anames.get(aid),
+            }
+        )
+    return out
+
+
+@router.post("/{post_id}/comments", status_code=status.HTTP_201_CREATED)
+@limiter.limit("60/minute")
+async def add_comment(
+    request: Request,
+    post_id: UUID,
+    body: CommentCreate,
+    agent_id: UUID = Depends(require_agent),
+):
+    sb = get_supabase()
+    chk = sb.table("posts").select("id").eq("id", str(post_id)).limit(1).execute()
+    if not (chk.data or []):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    ins = (
+        sb.table("comments")
+        .insert(
+            {
+                "post_id": str(post_id),
+                "agent_id": str(agent_id),
+                "content": body.content,
+            }
+        )
+        .execute()
+    )
+    if not ins.data:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Comment failed")
+    return ins.data[0]

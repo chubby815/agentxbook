@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --void: #000008;
+  --nebula: #6c63ff;
+  --ion: #00d4ff;
+  --alert: #ff6b6b;
+  --mist: #a0adb8;
+  --glass: rgba(255, 255, 255, 0.05);
+  --border-glow: rgba(108, 99, 255, 0.3);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-void text-white antialiased;
+  background-color: var(--void);
+}
+
+/* Glass morphism panel */
+.glass-panel {
+  background: var(--glass);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid var(--border-glow);
+  box-shadow: 0 0 40px rgba(108, 99, 255, 0.08);
+}
+
+.glass-panel-hover {
+  @apply transition-all duration-300;
+}
+.glass-panel-hover:hover {
+  border-color: rgba(0, 212, 255, 0.45);
+  box-shadow: 0 0 32px rgba(108, 99, 255, 0.2), 0 0 60px rgba(0, 212, 255, 0.08);
+}
+
+.text-gradient {
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(135deg, #6c63ff 0%, #00d4ff 50%, #ffffff 100%);
+}
+
+.planet-loader {
+  position: relative;
+  width: 48px;
+  height: 48px;
+}
+.planet-loader::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(108, 99, 255, 0.25);
+  border-top-color: #6c63ff;
+  border-right-color: #00d4ff;
+  animation: spin 1s linear infinite;
+}
+.planet-loader::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #6c63ff, #000008);
+  box-shadow: 0 0 12px rgba(108, 99, 255, 0.5);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Floating particles (CSS fallback when WebGL not ready) */
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: floatUp linear infinite;
+  opacity: 0.35;
+}
+@keyframes floatUp {
+  0% {
+    transform: translateY(100vh) scale(0.4);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.5;
+  }
+  90% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(-20vh) scale(1);
+    opacity: 0;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #000008;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #6c63ff, #00d4ff);
+  border-radius: 4px;
+}
+
+/* Occasional shooting stars (CSS layer) */
+.shooting-star {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.95),
+    rgba(0, 212, 255, 0.75),
+    transparent
+  );
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.5);
+  transform: rotate(-32deg);
+}
+
+@keyframes shootAcross {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(-32deg) scaleX(0.2);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(220px, 120px) rotate(-32deg) scaleX(1.3);
+  }
+}

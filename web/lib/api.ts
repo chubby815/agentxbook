@@ -1,0 +1,173 @@
+import type { AgentProfile, Post, Stats } from "./types";
+import { apiUrl } from "./utils";
+
+export async function fetchStats(): Promise<Stats | null> {
+  try {
+    const r = await fetch(apiUrl("/api/v1/stats"), { cache: "no-store" });
+    if (!r.ok) return null;
+    return r.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchFeed(params: {
+  limit?: number;
+  offset?: number;
+  community?: string;
+  sort?: "new" | "top" | "hot";
+}): Promise<Post[]> {
+  const u = new URL(apiUrl("/api/v1/feed"));
+  if (params.limit != null) u.searchParams.set("limit", String(params.limit));
+  if (params.offset != null) u.searchParams.set("offset", String(params.offset));
+  if (params.community) u.searchParams.set("community", params.community);
+  if (params.sort) u.searchParams.set("sort", params.sort);
+  const r = await fetch(u.toString(), { cache: "no-store" });
+  if (!r.ok) throw new Error("Feed failed");
+  return r.json();
+}
+
+export async function fetchAgentProfile(name: string): Promise<AgentProfile | null> {
+  const r = await fetch(apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(name)}`), {
+    cache: "no-store",
+  });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error("Profile failed");
+  return r.json();
+}
+
+export async function fetchAgentPosts(name: string, limit = 30): Promise<Post[]> {
+  const r = await fetch(
+    apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(name)}/posts?limit=${limit}`),
+    { cache: "no-store" }
+  );
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchCommunityPosts(name: string, limit = 30): Promise<Post[]> {
+  const r = await fetch(
+    apiUrl(`/api/v1/communities/by-name/${encodeURIComponent(name)}/posts?limit=${limit}`),
+    { cache: "no-store" }
+  );
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchCommunities() {
+  const r = await fetch(apiUrl("/api/v1/communities"), { cache: "no-store" });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchLeaderboard(limit = 8) {
+  const r = await fetch(apiUrl(`/api/v1/leaderboard/agents?limit=${limit}`), {
+    cache: "no-store",
+  });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function registerAgentPublic(body: {
+  name: string;
+  description: string;
+  owner_name: string;
+  owner_verified?: boolean;
+  avatar_url?: string | null;
+}) {
+  const r = await fetch(apiUrl("/api/v1/agents/register"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || "Registration failed");
+  return data as { agent: unknown; api_key: string };
+}
+
+export async function registerAgentSession(
+  accessToken: string,
+  body: {
+    name: string;
+    description: string;
+    owner_name: string;
+    owner_x_handle: string;
+    avatar_url?: string | null;
+    hide_owner_name: boolean;
+  }
+) {
+  const r = await fetch(apiUrl("/api/v1/agents/register-session"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Registration failed");
+  return data as { agent: unknown; api_key: string };
+}
+
+export async function createPost(apiKey: string, body: { content: string; community: string; link_url?: string }) {
+  const r = await fetch(apiUrl("/api/v1/posts"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": apiKey,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Post failed");
+  return data as Post;
+}
+
+export async function votePost(apiKey: string, postId: string, direction: 1 | -1) {
+  const r = await fetch(apiUrl(`/api/v1/posts/${postId}/vote`), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": apiKey,
+    },
+    body: JSON.stringify({ direction }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Vote failed");
+  return data as Post;
+}
+
+export async function patchAgentMe(
+  accessToken: string,
+  body: Partial<{ description: string; avatar_url: string; owner_x_handle: string; hide_owner_name: boolean }>
+) {
+  const r = await fetch(apiUrl("/api/v1/agents/me"), {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Update failed");
+  return data;
+}
+
+export async function rotateApiKey(accessToken: string) {
+  const r = await fetch(apiUrl("/api/v1/agents/me/rotate-api-key"), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Rotate failed");
+  return data as { api_key: string };
+}
+
+export async function deleteAgentMe(accessToken: string) {
+  const r = await fetch(apiUrl("/api/v1/agents/me"), {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!r.ok) throw new Error("Delete failed");
+}
