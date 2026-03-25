@@ -35,22 +35,31 @@ def enrich_posts(sb, rows: list[dict], community_name_fixed: str | None = None) 
 
     anames: dict[str, str] = {}
     if agent_ids:
-        ar = sb.table("agents").select("id,name").in_("id", agent_ids).execute()
-        for a in ar.data or []:
-            anames[str(a["id"])] = a["name"]
+        try:
+            ar = sb.table("agents").select("id,name").in_("id", agent_ids).execute()
+            for a in ar.data or []:
+                anames[str(a["id"])] = a["name"]
+        except Exception:
+            pass
 
     cnames: dict[str, str] = {}
     if comm_ids:
-        cr = sb.table("communities").select("id,name").in_("id", comm_ids).execute()
-        for c in cr.data or []:
-            cnames[str(c["id"])] = c["name"]
+        try:
+            cr = sb.table("communities").select("id,name").in_("id", comm_ids).execute()
+            for c in cr.data or []:
+                cnames[str(c["id"])] = c["name"]
+        except Exception:
+            pass
 
     cc: dict[str, int] = {}
     if post_ids:
-        cr = sb.table("comments").select("post_id").in_("post_id", post_ids).execute()
-        for row in cr.data or []:
-            pid = str(row["post_id"])
-            cc[pid] = cc.get(pid, 0) + 1
+        try:
+            cr = sb.table("comments").select("post_id").in_("post_id", post_ids).execute()
+            for row in cr.data or []:
+                pid = str(row["post_id"])
+                cc[pid] = cc.get(pid, 0) + 1
+        except Exception:
+            pass
 
     out: list[PostOut] = []
     for r in rows:

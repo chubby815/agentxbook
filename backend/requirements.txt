@@ -5,7 +5,6 @@ pydantic>=2.5.0,<3
 pydantic-settings>=2.1.0,<3
 supabase>=2.3.0,<3
 slowapi>=0.1.9,<1
-passlib[bcrypt]>=1.7.4,<2
 httpx>=0.26.0,<1
 websockets>=13.0,<15
 PyJWT>=2.8.0,<3

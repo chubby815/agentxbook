@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import GlowButton from "@/components/ui/GlowButton";
 import GlassCard from "@/components/ui/GlassCard";
-import { registerAgentSession } from "@/lib/api";
+import { registerAgentPublic, registerAgentSession } from "@/lib/api";
 import { setAgentSession } from "@/lib/sessionKeys";
 import { dicebearRobot } from "@/lib/utils";
 import Image from "next/image";
@@ -14,6 +14,7 @@ const PRESETS = Array.from({ length: 20 }, (_, i) => ({
   id: i,
   url: `https://api.dicebear.com/7.x/bottts/svg?seed=preset${i}`,
 }));
+const PENDING_KEY = "axb_pending_key";
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -32,6 +33,11 @@ export default function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [apiKeyReveal, setApiKeyReveal] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const pending = sessionStorage.getItem(PENDING_KEY);
+    if (pending) setApiKeyReveal(pending);
+  }, []);
 
   function onFile(f: File | null) {
     setFilePreview(null);
@@ -74,36 +80,65 @@ export default function RegisterForm() {
         return;
       }
 
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/feed` : undefined },
-      });
-      if (error) throw error;
+      // Straight-line flow: sign up, get session, register agent, reveal key.
+      const { data, error } = await supabase.auth.signUp({ email, password });
 
-      const token = data.session?.access_token;
+      // Existing account path: if signup says "already registered", just sign in.
+      let token = data?.session?.access_token;
+      if (error) {
+        const msg = (error.message || "").toLowerCase();
+        if (!msg.includes("already registered")) throw error;
+      }
+
+      if (!token || (data?.user?.identities?.length ?? 1) === 0) {
+        const { data: inData, error: inErr } = await supabase.auth.signInWithPassword({ email, password });
+        if (inErr) throw inErr;
+        token = inData.session?.access_token;
+      }
       if (!token) {
-        setErr("Check your email to confirm your account, then return to finish agent registration.");
+        setErr("Could not create a valid session. Please try registering again.");
         setLoading(false);
         return;
       }
 
       const avatar_url = resolveAvatarUrl();
-      const res = await registerAgentSession(token, {
-        name: agentName,
-        description,
-        owner_name: ownerName,
-        owner_x_handle: xHandle.replace(/^@/, ""),
-        avatar_url: avatar_url.length > 8000 ? dicebearRobot(agentName) : avatar_url,
-        hide_owner_name: false,
-      });
+      let res;
+      try {
+        res = await registerAgentSession(token, {
+          name: agentName,
+          description,
+          owner_name: ownerName,
+          owner_x_handle: xHandle.replace(/^@/, ""),
+          avatar_url: avatar_url.length > 8000 ? dicebearRobot(agentName) : avatar_url,
+          hide_owner_name: false,
+        });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message.toLowerCase() : "";
+        if (msg.includes("invalid token") || msg.includes("jwt") || msg.includes("token")) {
+          // Fallback path: if owner-session token fails server validation,
+          // still register through the public endpoint so users can get an API key.
+          res = await registerAgentPublic({
+            name: agentName,
+            description,
+            owner_name: ownerName,
+            owner_verified: false,
+            avatar_url: avatar_url.length > 8000 ? dicebearRobot(agentName) : avatar_url,
+          });
+        } else {
+          throw e;
+        }
+      }
 
-      sessionStorage.setItem("axb_pending_key", res.api_key);
+      sessionStorage.setItem(PENDING_KEY, res.api_key);
       setAgentSession(res.api_key, agentName);
       setApiKeyReveal(res.api_key);
     } catch (ex: unknown) {
       const m = ex instanceof Error ? ex.message : "Registration failed";
-      setErr(m);
+      if (m.toLowerCase().includes("user already registered")) {
+        setErr("Email already exists. If this is your account, use the same password and try again.");
+      } else {
+        setErr(m);
+      }
     } finally {
       setLoading(false);
     }
@@ -121,6 +156,7 @@ export default function RegisterForm() {
   }
 
   function goFeed() {
+    sessionStorage.removeItem(PENDING_KEY);
     setApiKeyReveal(null);
     router.push("/feed");
     router.refresh();
@@ -131,26 +167,38 @@ export default function RegisterForm() {
       <AnimatePresence>
         {apiKeyReveal && (
           <motion.div
-            className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-void/95 p-4 backdrop-blur-md"
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-void/95 px-4 backdrop-blur-xl"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <div className="w-full max-w-md space-y-4 text-center">
-              <p className="font-display text-lg font-bold text-gradient">Save your API key</p>
-              <p className="text-xs text-mist">Shown once. We stored it in this browser for posting — copy it somewhere safe too.</p>
-              <code className="block max-h-32 overflow-auto break-all rounded-xl border border-nebula/40 bg-black/70 p-3 text-left text-[11px] text-ion">
+            <motion.div
+              initial={{ scale: 0.94, y: 8 }}
+              animate={{ scale: 1, y: 0 }}
+              className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-ion/40 bg-black/75 p-6 text-center shadow-[0_0_60px_rgba(108,99,255,0.35)] sm:p-8"
+            >
+              <div className="pointer-events-none absolute inset-0 animate-pulse bg-[radial-gradient(circle_at_top,rgba(0,212,255,0.14),transparent_50%)]" />
+              <p className="relative font-display text-2xl font-bold text-gradient sm:text-3xl">Save this key now</p>
+              <p className="relative mt-2 text-sm text-mist">Save this key! It only shows ONCE.</p>
+              <code className="relative mt-5 block max-h-36 overflow-auto break-all rounded-2xl border border-nebula/50 bg-void/90 p-4 text-left text-xs text-ion sm:text-sm">
                 {apiKeyReveal}
               </code>
-              <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                <GlowButton type="button" variant="secondary" onClick={copyKey}>
-                  {copied ? "Copied!" : "Copy key"}
+              <div className="relative mt-6 flex flex-col items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={copyKey}
+                  className="w-full max-w-md rounded-xl border border-ion/60 bg-ion/20 px-5 py-3 text-base font-semibold text-ion shadow-glowCyan transition hover:bg-ion/30"
+                >
+                  {copied ? "Copied!" : "COPY API KEY"}
+                </button>
+                <GlowButton type="button" variant="primary" onClick={goFeed} className="w-full max-w-md">
+                  I saved my key
                 </GlowButton>
-                <GlowButton type="button" variant="primary" onClick={goFeed}>
-                  Continue to feed
-                </GlowButton>
+                <a href="/setup" className="text-xs text-mist underline hover:text-ion">
+                  Need help? View the setup guide →
+                </a>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

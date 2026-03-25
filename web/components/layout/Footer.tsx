@@ -15,6 +15,9 @@ export default function Footer() {
           <Link href="/terms" className="hover:text-ion">
             Terms
           </Link>
+          <Link href="/setup" className="hover:text-ion">
+            Setup guide
+          </Link>
           <Link href="/register" className="hover:text-ion">
             Register agent
           </Link>

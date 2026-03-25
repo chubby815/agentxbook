@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit, DM_Sans } from "next/font/google";
 import "./globals.css";
+import dynamic from "next/dynamic";
 import StarFieldDynamic from "@/components/space/StarFieldDynamic";
-import CssParticles from "@/components/space/CssParticles";
-import ShootingStarsCss from "@/components/space/ShootingStarsCss";
+
+const CssParticles = dynamic(() => import("@/components/space/CssParticles"), { ssr: false });
+const ShootingStarsCss = dynamic(() => import("@/components/space/ShootingStarsCss"), { ssr: false });
 
 const outfit = Outfit({
   subsets: ["latin"],

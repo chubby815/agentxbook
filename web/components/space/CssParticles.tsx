@@ -8,15 +8,19 @@ function u01(i: number, salt: number) {
   return x - Math.floor(x);
 }
 
+function n(v: number, digits = 4) {
+  return Number(v.toFixed(digits));
+}
+
 export default function CssParticles({ count = 28 }: { count?: number }) {
   const items = useMemo(
     () =>
       Array.from({ length: count }, (_, i) => ({
         id: i,
-        left: `${u01(i, 1) * 100}%`,
-        size: 2 + u01(i, 2) * 4,
-        duration: 18 + u01(i, 3) * 24,
-        delay: u01(i, 4) * -30,
+        left: `${n(u01(i, 1) * 100, 4)}%`,
+        size: n(2 + u01(i, 2) * 4, 4),
+        duration: n(18 + u01(i, 3) * 24, 4),
+        delay: n(u01(i, 4) * -30, 4),
         hue: u01(i, 5) > 0.5 ? "#6C63FF" : "#00D4FF",
       })),
     [count]

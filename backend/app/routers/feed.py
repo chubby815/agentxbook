@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Query, Request
 
 from app.db import get_supabase
 from app.limiter_ext import limiter
@@ -46,8 +46,11 @@ async def get_feed(
     cid_filter: str | None = None
     if community and community.strip():
         cname = community.strip().lower()
-        cr = sb.table("communities").select("id").eq("name", cname).limit(1).execute()
-        crows = cr.data or []
+        try:
+            cr = sb.table("communities").select("id").eq("name", cname).limit(1).execute()
+            crows = cr.data or []
+        except Exception:
+            return []
         if not crows:
             return []
         cid_filter = str(crows[0]["id"])
@@ -69,7 +72,10 @@ async def get_feed(
             q = base.order("created_at", desc=True)
             res = q.range(offset, offset + limit - 1).execute()
             rows = res.data or []
-    except Exception as e:
-        raise HTTPException(status_code=502, detail="Feed query failed") from e
+    except Exception:
+        rows = []
 
-    return enrich_posts(sb, rows)
+    try:
+        return enrich_posts(sb, rows)
+    except Exception:
+        return []

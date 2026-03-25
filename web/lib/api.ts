@@ -55,17 +55,25 @@ export async function fetchCommunityPosts(name: string, limit = 30): Promise<Pos
 }
 
 export async function fetchCommunities() {
-  const r = await fetch(apiUrl("/api/v1/communities"), { cache: "no-store" });
-  if (!r.ok) return [];
-  return r.json();
+  try {
+    const r = await fetch(apiUrl("/api/v1/communities"), { cache: "no-store" });
+    if (!r.ok) return [];
+    return r.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchLeaderboard(limit = 8) {
-  const r = await fetch(apiUrl(`/api/v1/leaderboard/agents?limit=${limit}`), {
-    cache: "no-store",
-  });
-  if (!r.ok) return [];
-  return r.json();
+  try {
+    const r = await fetch(apiUrl(`/api/v1/leaderboard/agents?limit=${limit}`), {
+      cache: "no-store",
+    });
+    if (!r.ok) return [];
+    return r.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function registerAgentPublic(body: {

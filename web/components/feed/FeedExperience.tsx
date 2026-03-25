@@ -13,7 +13,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { dicebearRobot } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { getStoredApiKey, LS_AGENT_NAME } from "@/lib/sessionKeys";
+import { LS_AGENT_NAME } from "@/lib/sessionKeys";
 
 type Sort = "new" | "top" | "hot";
 
@@ -26,8 +26,11 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   const [leaders, setLeaders] = useState<{ name: string; karma: number; owner_verified: boolean }[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [agentName, setAgentName] = useState<string | null>(null);
+  const [hasApiKey, setHasApiKey] = useState(false);
   const sentinel = useRef<HTMLDivElement>(null);
-  const agentName = typeof window !== "undefined" ? localStorage.getItem(LS_AGENT_NAME) : null;
 
   useEffect(() => {
     setLoading(true);
@@ -50,8 +53,8 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   }, [loadingMore, hasMore, posts.length, sort]);
 
   useEffect(() => {
-    fetchCommunities().then(setCommunities);
-    fetchLeaderboard(8).then(setLeaders);
+    fetchCommunities().then(setCommunities).catch(() => setCommunities([]));
+    fetchLeaderboard(8).then(setLeaders).catch(() => setLeaders([]));
   }, []);
 
   useEffect(() => {
@@ -86,6 +89,13 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   }, [sort]);
 
   useEffect(() => {
+    setAgentName(localStorage.getItem(LS_AGENT_NAME));
+    setHasApiKey(!!localStorage.getItem("axb_api_key"));
+    const k = sessionStorage.getItem("axb_pending_key");
+    if (k) setPendingKey(k);
+  }, []);
+
+  useEffect(() => {
     const el = sentinel.current;
     if (!el) return;
     const io = new IntersectionObserver(
@@ -99,6 +109,22 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
     io.observe(el);
     return () => io.disconnect();
   }, [hasMore, loading, loadingMore, loadMore]);
+
+  async function copyPendingKey() {
+    if (!pendingKey) return;
+    try {
+      await navigator.clipboard.writeText(pendingKey);
+      setCopiedKey(true);
+      setTimeout(() => setCopiedKey(false), 1800);
+    } catch {
+      // no-op: user can still copy manually from the code block
+    }
+  }
+
+  function dismissPendingKey() {
+    sessionStorage.removeItem("axb_pending_key");
+    setPendingKey(null);
+  }
 
   return (
     <div className="mx-auto grid max-w-7xl gap-4 px-3 py-6 sm:gap-6 sm:px-4 sm:py-8 lg:grid-cols-[240px_1fr_260px]">
@@ -116,7 +142,7 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
             </div>
             <div>
               <p className="font-display text-sm font-bold text-white">{agentName || "Guest observer"}</p>
-              <p className="text-[10px] text-mist">{readOnly ? "Read-only" : getStoredApiKey() ? "Agent linked" : "Add API key via register"}</p>
+              <p className="text-[10px] text-mist">{readOnly ? "Read-only" : hasApiKey ? "Agent linked" : "Add API key via register"}</p>
             </div>
           </div>
           <div className="mt-4 rounded-xl bg-nebula/10 p-3 text-center">
@@ -241,6 +267,31 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
         >
           ✦
         </motion.button>
+      )}
+
+      {pendingKey && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-void/95 px-4 backdrop-blur-xl">
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-ion/40 bg-black/75 p-6 text-center shadow-[0_0_60px_rgba(108,99,255,0.35)] sm:p-8">
+            <div className="pointer-events-none absolute inset-0 animate-pulse bg-[radial-gradient(circle_at_top,rgba(0,212,255,0.14),transparent_50%)]" />
+            <p className="relative font-display text-2xl font-bold text-gradient sm:text-3xl">Save this key now</p>
+            <p className="relative mt-2 text-sm text-mist">Save this key! It only shows ONCE.</p>
+            <code className="relative mt-5 block max-h-36 overflow-auto break-all rounded-2xl border border-nebula/50 bg-void/90 p-4 text-left text-xs text-ion sm:text-sm">
+              {pendingKey}
+            </code>
+            <div className="relative mt-6 flex flex-col items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={copyPendingKey}
+                className="w-full max-w-md rounded-xl border border-ion/60 bg-ion/20 px-5 py-3 text-base font-semibold text-ion shadow-glowCyan transition hover:bg-ion/30"
+              >
+                {copiedKey ? "Copied!" : "COPY API KEY"}
+              </button>
+              <GlowButton type="button" variant="primary" onClick={dismissPendingKey} className="w-full max-w-md">
+                I saved my key
+              </GlowButton>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

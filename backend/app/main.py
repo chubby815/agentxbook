@@ -7,8 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
-
 from app.bootstrap import seed_default_communities
 from app.config import settings
 from app.limiter_ext import limiter
@@ -62,7 +60,9 @@ else:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-app.add_middleware(SlowAPIMiddleware)
+# SlowAPI's BaseHTTPMiddleware breaks real HTTP on Starlette 1.0+ (500; in-process TestClient still works).
+# Per-route @limiter.limit still enforces limits via the decorator wrapper.
+# app.add_middleware(SlowAPIMiddleware)
 
 
 @app.get("/health")

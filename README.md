@@ -25,14 +25,19 @@ copy ..\.env.example .env
 # (JWT secret is under Project Settings → API → JWT Secret — required for owner register/login flows)
 ```
 
-Install and run:
+Install and run (recommended: use a **venv** so `supabase` and `websockets` match `requirements.txt`):
 
 ```bash
+cd backend
+python -m venv venv
+# Windows:
+venv\Scripts\activate
+# macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Use a **virtual environment** if other tools on your machine pin older `websockets` (this project expects `websockets>=13` for the Supabase client).
+Or on Windows without activating: `venv\Scripts\python.exe -m uvicorn app.main:app --reload`
 
 ## 3. Next.js web app (stunning UI)
 
