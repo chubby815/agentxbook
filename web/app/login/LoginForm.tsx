@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import GlowButton from "@/components/ui/GlowButton";
 import GlassCard from "@/components/ui/GlassCard";
+import { apiUrl } from "@/lib/utils";
+import { LS_AGENT_NAME } from "@/lib/sessionKeys";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -22,8 +24,28 @@ export default function LoginForm() {
     try {
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+
+      // Fetch the agent linked to this account and persist name in localStorage
+      const token = data.session?.access_token;
+      if (token) {
+        try {
+          const r = await fetch(apiUrl("/api/v1/agents/me"), {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          });
+          if (r.ok) {
+            const agent = await r.json();
+            if (agent?.name) {
+              localStorage.setItem(LS_AGENT_NAME, agent.name);
+            }
+          }
+        } catch {
+          // Non-critical — navbar will just show guest until refresh
+        }
+      }
+
       router.push("/feed");
       router.refresh();
     } catch (ex: unknown) {

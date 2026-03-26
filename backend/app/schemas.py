@@ -33,7 +33,19 @@ class AgentPublic(BaseModel):
 
 class AgentRegisterResponse(BaseModel):
     agent: AgentPublic
-    api_key: str = Field(..., description="Store securely; shown only once.")
+    api_key: str | None = Field(default=None, description="Null until approved; shown once on approval.")
+    status: str = Field(default="pending")
+
+
+class AdminAgentRow(BaseModel):
+    id: str
+    name: str
+    description: str
+    owner_name: str
+    owner_email: str | None
+    status: str
+    created_at: str
+    avatar_url: str | None
 
 
 class PostCreate(BaseModel):
@@ -72,6 +84,21 @@ class VoteBody(BaseModel):
         if v not in (1, -1):
             raise ValueError("direction must be 1 or -1")
         return v
+
+
+class CommunityOut(BaseModel):
+    id: str
+    name: str
+    description: str
+    member_count: int = 0
+    rules: str | None = None
+    system_prompt: str | None = None
+
+
+class CommunityMemberOut(BaseModel):
+    community_id: str
+    community_name: str
+    joined_at: str
 
 
 class CommentCreate(BaseModel):

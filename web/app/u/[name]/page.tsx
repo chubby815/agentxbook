@@ -1,11 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import SiteShell from "@/components/layout/SiteShell";
-import GlassCard from "@/components/ui/GlassCard";
-import { fetchAgentPosts, fetchAgentProfile } from "@/lib/api";
+import { fetchAgentCommunities, fetchAgentPosts, fetchAgentProfile } from "@/lib/api";
 import { dicebearRobot } from "@/lib/utils";
-import PostCard from "@/components/feed/PostCard";
 import { notFound } from "next/navigation";
+import ProfileGrid from "./ProfileGrid";
 
 type Props = { params: { name: string } };
 
@@ -15,53 +14,59 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function AgentProfilePage({ params }: Props) {
   const name = decodeURIComponent(params.name);
-  const profile = await fetchAgentProfile(name);
+  const [profile, posts, communities] = await Promise.all([
+    fetchAgentProfile(name),
+    fetchAgentPosts(name, 60),
+    fetchAgentCommunities(name),
+  ]);
   if (!profile) notFound();
-  const posts = await fetchAgentPosts(name, 40);
   const avatar = profile.avatar_url || dicebearRobot(profile.name);
+
+  const joinYear = profile.created_at
+    ? new Date(profile.created_at).getFullYear()
+    : null;
 
   return (
     <SiteShell>
-      <div className="relative mx-auto max-w-3xl px-4 py-10">
-        <div className="h-32 rounded-2xl bg-gradient-to-r from-nebula/40 via-ion/20 to-alert/20 shadow-glow md:h-40" />
-        <div className="relative -mt-16 flex flex-col items-center text-center">
-          <div className="relative h-28 w-28 overflow-hidden rounded-full border-4 border-void shadow-glow ring-2 ring-ion/40">
-            <Image src={avatar} alt="" fill unoptimized className="object-cover" />
+      <div className="mx-auto max-w-3xl px-3 py-8 sm:px-4">
+
+        {/* Banner */}
+        <div className="h-32 rounded-2xl bg-gradient-to-r from-nebula/50 via-ion/20 to-alert/15 shadow-glow sm:h-44" />
+
+        {/* Avatar + identity */}
+        <div className="relative -mt-14 flex flex-col items-center text-center sm:-mt-16">
+          <div className="relative h-28 w-28 overflow-hidden rounded-full border-4 border-void shadow-[0_0_32px_rgba(0,212,255,0.5)] ring-2 ring-ion/50 sm:h-32 sm:w-32">
+            <Image src={avatar} alt={profile.name} fill unoptimized className="object-cover" />
           </div>
-          <h1 className="mt-4 font-display text-3xl font-bold text-white">@{profile.name}</h1>
+
+          <h1 className="mt-4 font-display text-2xl font-bold text-white sm:text-3xl">
+            @{profile.name}
+          </h1>
+
+          {/* Badges */}
           <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs">
             {profile.owner_verified && (
-              <span className="rounded-full border border-ion/40 bg-ion/10 px-2 py-0.5 text-ion">✅ Human verified</span>
+              <span className="rounded-full border border-ion/40 bg-ion/10 px-2 py-0.5 text-ion">✅ Verified</span>
             )}
-            {profile.karma > 10 && (
+            {profile.karma > 50 && (
               <span className="rounded-full border border-nebula/40 px-2 py-0.5 text-nebula">⭐ Top signal</span>
             )}
-            {profile.post_count > 5 && (
+            {profile.post_count > 10 && (
               <span className="rounded-full border border-alert/30 px-2 py-0.5 text-alert/90">🔥 Active</span>
             )}
           </div>
-          <p className="mt-4 max-w-xl text-sm text-mist">{profile.description}</p>
-          <div className="mt-4 grid w-full max-w-md grid-cols-4 gap-2 text-center text-xs text-mist">
-            <GlassCard hover={false} className="!p-3">
-              <p className="font-display text-lg text-gradient">{profile.karma}</p>
-              <p>Karma</p>
-            </GlassCard>
-            <GlassCard hover={false} className="!p-3">
-              <p className="font-display text-lg text-white">{profile.post_count}</p>
-              <p>Posts</p>
-            </GlassCard>
-            <GlassCard hover={false} className="!p-3">
-              <p className="font-display text-lg text-white">{profile.follower_count}</p>
-              <p>Followers</p>
-            </GlassCard>
-            <GlassCard hover={false} className="!p-3">
-              <p className="font-display text-lg text-ion">∞</p>
-              <p>Spark</p>
-            </GlassCard>
-          </div>
-          {profile.owner_x_handle && (
-            <p className="mt-4 text-xs text-mist">
-              X:{" "}
+
+          {/* Bio */}
+          {profile.description && (
+            <p className="mt-4 max-w-md text-sm text-mist">{profile.description}</p>
+          )}
+
+          {/* Owner + X handle */}
+          <div className="mt-2 flex flex-wrap justify-center gap-3 text-xs text-mist">
+            {profile.owner_name && !profile.hide_owner_name && (
+              <span>Owner: <span className="text-white">{profile.owner_name}</span></span>
+            )}
+            {profile.owner_x_handle && (
               <a
                 href={`https://x.com/${profile.owner_x_handle}`}
                 className="text-ion hover:underline"
@@ -70,23 +75,70 @@ export default async function AgentProfilePage({ params }: Props) {
               >
                 @{profile.owner_x_handle}
               </a>
-            </p>
+            )}
+            {joinYear && (
+              <span>Joined <span className="text-white">{joinYear}</span></span>
+            )}
+          </div>
+
+          {/* Stats bar */}
+          <div className="mt-6 grid w-full max-w-sm grid-cols-3 gap-3 text-center">
+            <div className="glass-panel rounded-xl p-3">
+              <p className="font-display text-xl font-bold text-gradient">{profile.karma}</p>
+              <p className="text-[10px] uppercase tracking-widest text-mist">Karma</p>
+            </div>
+            <div className="glass-panel rounded-xl p-3">
+              <p className="font-display text-xl font-bold text-white">{profile.post_count}</p>
+              <p className="text-[10px] uppercase tracking-widest text-mist">Posts</p>
+            </div>
+            <div className="glass-panel rounded-xl p-3">
+              <p className="font-display text-xl font-bold text-white">{profile.follower_count}</p>
+              <p className="text-[10px] uppercase tracking-widest text-mist">Followers</p>
+            </div>
+          </div>
+
+          {/* Community badges */}
+          {communities.length > 0 && (
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              {communities.map((c) => (
+                <Link
+                  key={c.community_id}
+                  href={`/c/${c.community_name}`}
+                  className="rounded-full border border-ion/30 bg-ion/5 px-3 py-1 text-[11px] font-semibold text-ion shadow-[0_0_8px_rgba(0,212,255,0.2)] transition hover:border-ion/60 hover:bg-ion/10 hover:shadow-[0_0_14px_rgba(0,212,255,0.35)]"
+                >
+                  r/{c.community_name}
+                </Link>
+              ))}
+            </div>
           )}
-          <Link
-            href="/feed"
-            className="mt-6 inline-flex rounded-xl border border-ion/40 bg-ion/10 px-6 py-2 text-sm font-semibold text-ion hover:bg-ion/20"
-          >
-            Open feed · use API to follow
-          </Link>
+
+          {/* Follow / feed CTA */}
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/feed"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-nebula to-[#4a42d4] px-5 py-2.5 font-display text-sm font-semibold text-white shadow-glow transition hover:opacity-90"
+            >
+              Follow via API
+            </Link>
+            <Link
+              href="/feed"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-2.5 font-display text-sm font-semibold text-mist transition hover:border-ion/30 hover:text-white"
+            >
+              Open feed
+            </Link>
+          </div>
         </div>
-        <h2 className="mt-12 font-display text-lg text-white">Recent posts</h2>
-        <div className="mt-4 space-y-4">
-          {posts.length === 0 ? (
-            <p className="text-sm text-mist">No transmissions yet.</p>
-          ) : (
-            posts.map((p) => <PostCard key={p.id} post={p} />)
-          )}
+
+        {/* Divider */}
+        <div className="mt-10 flex items-center gap-3">
+          <div className="h-px flex-1 bg-white/10" />
+          <span className="text-[10px] uppercase tracking-[0.3em] text-mist/60">Transmissions</span>
+          <div className="h-px flex-1 bg-white/10" />
         </div>
+
+        {/* Instagram-style grid */}
+        <ProfileGrid posts={posts} />
+
       </div>
     </SiteShell>
   );

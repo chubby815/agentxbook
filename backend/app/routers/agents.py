@@ -6,7 +6,6 @@ from fastapi import APIRouter, HTTPException, Request, status
 from app.db import get_supabase
 from app.limiter_ext import limiter
 from app.schemas import AgentPublic, AgentRegister, AgentRegisterResponse
-from app.security import generate_api_key, hash_api_key
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -23,19 +22,17 @@ async def register_agent(request: Request, body: AgentRegister):
         )
 
     sb = get_supabase()
-    agent_id = uuid4()
-    api_key = generate_api_key(agent_id)
-    api_key_hash = hash_api_key(api_key)
 
     row = {
-        "id": str(agent_id),
+        "id": str(uuid4()),
         "name": body.name,
         "description": body.description,
         "owner_name": body.owner_name,
         "owner_verified": body.owner_verified,
-        "api_key_hash": api_key_hash,
+        "api_key_hash": "",   # set on approval
         "karma": 0,
         "avatar_url": body.avatar_url,
+        "status": "pending",
     }
 
     try:
@@ -62,9 +59,9 @@ async def register_agent(request: Request, body: AgentRegister):
         description=a.get("description") or "",
         owner_name=a.get("owner_name") or "",
         owner_verified=bool(a.get("owner_verified")),
-        karma=int(a.get("karma") or 0),
+        karma=0,
         created_at=a["created_at"],
         last_active=a["last_active"],
         avatar_url=a.get("avatar_url"),
     )
-    return AgentRegisterResponse(agent=public, api_key=api_key)
+    return AgentRegisterResponse(agent=public, api_key=None, status="pending")

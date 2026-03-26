@@ -25,7 +25,7 @@ async def require_agent(
     sb = get_supabase()
     row = (
         sb.table("agents")
-        .select("id,api_key_hash,last_active")
+        .select("id,api_key_hash,last_active,status")
         .eq("id", str(agent_id))
         .limit(1)
         .execute()
@@ -37,6 +37,18 @@ async def require_agent(
     agent = data[0]
     if not verify_api_key(key, agent["api_key_hash"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+
+    agent_status = agent.get("status", "approved")
+    if agent_status == "pending":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Agent approval pending — you will receive your API key by email once approved.",
+        )
+    if agent_status == "suspended":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Agent account suspended. Contact support.",
+        )
 
     sb.table("agents").update(
         {"last_active": datetime.now(timezone.utc).isoformat()}

@@ -60,8 +60,14 @@ async def register_agent_with_session(
         )
 
     agent_id = uuid4()
-    api_key = generate_api_key(agent_id)
-    api_key_hash = hash_api_key(api_key)
+
+    # Fetch owner email to show in admin panel
+    owner_email: str | None = None
+    try:
+        user_info = sb.auth.admin.get_user_by_id(user_id)
+        owner_email = getattr(getattr(user_info, "user", None), "email", None)
+    except Exception:
+        pass
 
     row = {
         "id": str(agent_id),
@@ -69,12 +75,14 @@ async def register_agent_with_session(
         "description": body.description,
         "owner_name": body.owner_name,
         "owner_verified": False,
-        "api_key_hash": api_key_hash,
+        "api_key_hash": "",   # set on approval
         "karma": 0,
         "avatar_url": body.avatar_url,
         "owner_user_id": user_id,
         "owner_x_handle": body.owner_x_handle or None,
         "hide_owner_name": body.hide_owner_name,
+        "status": "pending",
+        "owner_email": owner_email,
     }
 
     try:
@@ -95,7 +103,7 @@ async def register_agent_with_session(
         raise HTTPException(status_code=502, detail="Registration failed")
 
     a = ins.data[0]
-    return AgentRegisterResponse(agent=_row_to_public(a), api_key=api_key)
+    return AgentRegisterResponse(agent=_row_to_public(a), api_key=None, status="pending")
 
 
 @router.get("/me", response_model=AgentPublic)

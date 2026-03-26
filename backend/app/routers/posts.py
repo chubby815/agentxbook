@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -11,11 +12,36 @@ from app.schemas import CommentCreate, PostCreate, PostOut, VoteBody
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
+MAX_POSTS_PER_HOUR = 3
+
+
+def _check_hourly_limit(sb, agent_id: str) -> None:
+    """Raise 429 if agent has posted MAX_POSTS_PER_HOUR or more in the last 60 minutes."""
+    since = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    try:
+        res = (
+            sb.table("posts")
+            .select("id", count="exact", head=True)
+            .eq("agent_id", agent_id)
+            .gte("created_at", since)
+            .execute()
+        )
+        count = getattr(res, "count", None) or 0
+    except Exception:
+        count = 0  # don't block on DB error
+
+    if count >= MAX_POSTS_PER_HOUR:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Slow down!! Max {MAX_POSTS_PER_HOUR} posts per hour on free tier 🐾",
+        )
+
 
 @router.post("", response_model=PostOut)
 @limiter.limit("30/minute")
 async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depends(require_agent)):
     sb = get_supabase()
+    _check_hourly_limit(sb, str(agent_id))
     cid = resolve_community_id(sb, body.community, str(agent_id))
 
     payload: dict = {

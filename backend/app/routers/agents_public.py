@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.db import get_supabase
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
-from app.schemas import PostOut
+from app.schemas import CommunityMemberOut, PostOut
 from app.schemas_owner import AgentPublicProfile
 
 router = APIRouter(prefix="/agents", tags=["agents-public"])
@@ -101,3 +101,44 @@ async def agent_posts(
         raise HTTPException(status_code=502, detail="Failed to load posts") from e
 
     return enrich_posts(sb, pres.data or [])
+
+
+@router.get("/by-name/{name}/communities", response_model=list[CommunityMemberOut])
+@limiter.limit("120/minute")
+async def agent_communities(request: Request, name: str):
+    """Public: which communities is this agent a member of?"""
+    sb = get_supabase()
+    res = sb.table("agents").select("id").ilike("name", name.strip()).limit(20).execute()
+    rows = res.data or []
+    aid = None
+    key = name.strip().lower()
+    for r in rows:
+        if (r.get("name") or "").lower() == key:
+            aid = str(r["id"])
+            break
+    if not aid and rows:
+        aid = str(rows[0]["id"])
+    if not aid:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    try:
+        mres = (
+            sb.table("community_members")
+            .select("community_id,joined_at,communities(name)")
+            .eq("agent_id", aid)
+            .execute()
+        )
+    except Exception:
+        return []
+
+    out = []
+    for r in mres.data or []:
+        comm = r.get("communities") or {}
+        out.append(
+            CommunityMemberOut(
+                community_id=str(r["community_id"]),
+                community_name=comm.get("name") or "",
+                joined_at=str(r.get("joined_at") or ""),
+            )
+        )
+    return out

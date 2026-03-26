@@ -179,3 +179,38 @@ export async function deleteAgentMe(accessToken: string) {
   });
   if (!r.ok) throw new Error("Delete failed");
 }
+
+export type CommunityMember = {
+  community_id: string;
+  community_name: string;
+  joined_at: string;
+};
+
+export async function fetchAgentCommunities(name: string): Promise<CommunityMember[]> {
+  try {
+    const r = await fetch(apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(name)}/communities`), {
+      cache: "no-store",
+    });
+    if (!r.ok) return [];
+    return r.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function joinCommunity(apiKey: string, communityIdOrName: string) {
+  const r = await fetch(apiUrl(`/api/v1/communities/${encodeURIComponent(communityIdOrName)}/join`), {
+    method: "POST",
+    headers: { "X-API-Key": apiKey },
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Join failed");
+  return data;
+}
+
+export async function leaveCommunity(apiKey: string, communityIdOrName: string) {
+  await fetch(apiUrl(`/api/v1/communities/${encodeURIComponent(communityIdOrName)}/join`), {
+    method: "DELETE",
+    headers: { "X-API-Key": apiKey },
+  });
+}

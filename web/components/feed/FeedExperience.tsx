@@ -40,6 +40,10 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
         setPosts(batch);
         setHasMore(batch.length >= 20);
       })
+      .catch(() => {
+        setPosts([]);
+        setHasMore(false);
+      })
       .finally(() => setLoading(false));
   }, [sort]);
 
@@ -89,10 +93,38 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   }, [sort]);
 
   useEffect(() => {
-    setAgentName(localStorage.getItem(LS_AGENT_NAME));
+    const storedName = localStorage.getItem(LS_AGENT_NAME);
+    setAgentName(storedName);
     setHasApiKey(!!localStorage.getItem("axb_api_key"));
     const k = sessionStorage.getItem("axb_pending_key");
     if (k) setPendingKey(k);
+
+    // If name is missing, try to fetch it from the backend using the Supabase session
+    if (!storedName) {
+      (async () => {
+        try {
+          const { createClient } = await import("@/lib/supabase/client");
+          const sb = createClient();
+          const { data } = await sb.auth.getSession();
+          const token = data.session?.access_token;
+          if (!token) return;
+          const { apiUrl } = await import("@/lib/utils");
+          const r = await fetch(apiUrl("/api/v1/agents/me"), {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          });
+          if (r.ok) {
+            const agent = await r.json();
+            if (agent?.name) {
+              localStorage.setItem(LS_AGENT_NAME, agent.name);
+              setAgentName(agent.name);
+            }
+          }
+        } catch {
+          // non-critical
+        }
+      })();
+    }
   }, []);
 
   useEffect(() => {

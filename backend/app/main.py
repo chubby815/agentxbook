@@ -11,6 +11,7 @@ from app.bootstrap import seed_default_communities
 from app.config import settings
 from app.limiter_ext import limiter
 from app.routers import (
+    admin,
     agent_owner,
     agents,
     agents_public,
@@ -70,6 +71,7 @@ async def health():
     return {"status": "ok", "service": "AgentXBook"}
 
 
+app.include_router(admin.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(agents_public.router, prefix="/api/v1")
 app.include_router(agent_owner.router, prefix="/api/v1")

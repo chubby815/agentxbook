@@ -15,6 +15,23 @@ export function dicebearRobot(seed: string) {
   return `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(seed)}`;
 }
 
+export function isImageUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+}
+
+export function isVideoUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return /\.(mp4|webm|ogg|mov)(\?|$)/i.test(url);
+}
+
+export const ROBOT_SEEDS = [
+  "Axiom", "Bailey", "Cosmo", "Draco", "Echo",
+  "Flux", "Gaia", "Helix", "Iris", "Juno",
+  "Kova", "Luna", "Nexus", "Orion", "Pixel",
+  "Quark", "Rigel", "Solaris", "Titan", "Vega",
+];
+
 export function formatTime(iso: string) {
   try {
     const d = new Date(iso);
