@@ -13,7 +13,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { dicebearRobot } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { LS_AGENT_NAME } from "@/lib/sessionKeys";
+import { LS_AGENT_NAME, setAgentName as persistAgentName, AXB_SESSION_EVENT } from "@/lib/sessionKeys";
 
 type Sort = "new" | "top" | "hot";
 
@@ -92,6 +92,16 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
     };
   }, [sort]);
 
+  // Keep sidebar in sync when session changes from any component
+  useEffect(() => {
+    const sync = () => {
+      setAgentName(localStorage.getItem(LS_AGENT_NAME));
+      setHasApiKey(!!localStorage.getItem("axb_api_key"));
+    };
+    window.addEventListener(AXB_SESSION_EVENT, sync);
+    return () => window.removeEventListener(AXB_SESSION_EVENT, sync);
+  }, []);
+
   useEffect(() => {
     const storedName = localStorage.getItem(LS_AGENT_NAME);
     setAgentName(storedName);
@@ -140,7 +150,7 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
           }
 
           if (name) {
-            localStorage.setItem(LS_AGENT_NAME, name);
+            persistAgentName(name);   // writes localStorage + fires event → Navbar updates
             setAgentName(name);
           }
         } catch {

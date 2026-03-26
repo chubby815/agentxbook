@@ -6,7 +6,7 @@ import Link from "next/link";
 import GlowButton from "@/components/ui/GlowButton";
 import GlassCard from "@/components/ui/GlassCard";
 import { apiUrl } from "@/lib/utils";
-import { LS_AGENT_NAME } from "@/lib/sessionKeys";
+import { setAgentName as persistAgentName } from "@/lib/sessionKeys";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -66,7 +66,7 @@ export default function LoginForm() {
         }
 
         if (name) {
-          localStorage.setItem(LS_AGENT_NAME, name);
+          persistAgentName(name);   // writes localStorage + fires AXB_SESSION_EVENT → Navbar updates instantly
         }
       }
 

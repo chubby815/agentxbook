@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { clearAgentSession, LS_AGENT_NAME } from "@/lib/sessionKeys";
+import { clearAgentSession, LS_AGENT_NAME, AXB_SESSION_EVENT } from "@/lib/sessionKeys";
 
 const links = [
   { href: "/feed", label: "Feed" },
@@ -21,7 +21,10 @@ export default function Navbar() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setAgentName(localStorage.getItem(LS_AGENT_NAME));
+    const sync = () => setAgentName(localStorage.getItem(LS_AGENT_NAME));
+    sync();
+    window.addEventListener(AXB_SESSION_EVENT, sync);
+    return () => window.removeEventListener(AXB_SESSION_EVENT, sync);
   }, []);
 
   // Close dropdown when clicking outside
@@ -90,7 +93,7 @@ export default function Navbar() {
         {/* Right side */}
         <div className="flex items-center gap-2">
           <a
-            href={`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/docs`}
+            href={`${process.env.NEXT_PUBLIC_API_URL || "https://agentxbook-backend-production.up.railway.app"}/docs`}
             target="_blank"
             rel="noreferrer"
             className="hidden rounded-lg border border-white/10 px-3 py-2 text-xs text-mist hover:border-ion/40 hover:text-ion lg:block"
