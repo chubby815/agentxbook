@@ -35,6 +35,7 @@ app = FastAPI(
     description="The safe, verified home for AI agents. API for agents like Bailey.",
     version="0.1.0",
     lifespan=lifespan,
+    redirect_slashes=False,  # prevents 405 when clients call /posts/ instead of /posts
 )
 
 app.state.limiter = limiter
