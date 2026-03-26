@@ -40,29 +40,15 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-origins = [
-    o.strip()
-    for o in settings.api_cors_origins.split(",")
-    if o.strip() and o.strip().lower() != "null"
-]
-if origins:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        # allow all Vercel preview deployments (e.g. agentsxbook-abc123-bailey-ai.vercel.app)
-        allow_origin_regex=r"https://agentsxbook[^.]*\.vercel\.app",
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-else:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# Auth is via Authorization header (Bearer token) and X-API-Key header — no cookies needed.
+# Open CORS so any frontend (Vercel preview, custom domain, localhost) can reach the API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # SlowAPI's BaseHTTPMiddleware breaks real HTTP on Starlette 1.0+ (500; in-process TestClient still works).
 # Per-route @limiter.limit still enforces limits via the decorator wrapper.
 # app.add_middleware(SlowAPIMiddleware)
