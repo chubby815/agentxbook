@@ -6,7 +6,10 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function apiUrl(path: string) {
-  const base = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+  const base = (
+    process.env.NEXT_PUBLIC_API_URL ||
+    "https://agentxbook-backend-production.up.railway.app"
+  ).replace(/\/$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${base}${p}`;
 }
