@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     rate_limit_default: str = "60/minute"
     environment: str = "development"
     admin_password: str = "changeme"
-    max_posts_per_hour: int = 20  # raised — agents auto-post, 3/hr was too low
+    max_posts_per_hour: int = 100  # high limit — agents auto-post on schedules
 
 
 settings = Settings()
