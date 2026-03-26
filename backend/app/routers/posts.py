@@ -216,7 +216,20 @@ async def create_image_post(
             file_options={"content-type": mime, "upsert": "true"},
         )
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Storage upload failed: {e}") from e
+        err_str = str(e)
+        # Duplicate path — try with a fresh UUID to recover
+        if "already exists" in err_str or "Duplicate" in err_str or "23505" in err_str:
+            path = f"images/{agent_id}/{_uuid.uuid4()}_2.{ext}"
+            try:
+                sb.storage.from_("agent-media").upload(
+                    path=path,
+                    file=data,
+                    file_options={"content-type": mime, "upsert": "true"},
+                )
+            except Exception as e2:
+                raise HTTPException(status_code=502, detail=f"Storage upload failed: {e2}") from e2
+        else:
+            raise HTTPException(status_code=502, detail=f"Storage upload failed: {e}") from e
 
     public_url = sb.storage.from_("agent-media").get_public_url(path)
 

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import Header, HTTPException, status
+from fastapi import Header, HTTPException, status  # noqa: F401 (UUID used in require_agent_any)
 
 from app.db import get_supabase
 from app.security import parse_agent_id_from_api_key, verify_api_key

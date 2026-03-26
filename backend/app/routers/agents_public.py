@@ -1,9 +1,8 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from app.db import get_supabase
-from app.deps import require_agent, require_agent_any
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
 from app.schemas import CommunityMemberOut, PostOut
@@ -46,11 +45,9 @@ async def agent_by_name(request: Request, name: str):
     )
     post_count = getattr(pc, "count", None) or 0
 
-    fc = sb.table("follows").select("follower_id").eq("following_id", aid).execute()
+    fc = sb.table("user_agent_follows").select("user_id").eq("agent_id", aid).execute()
     follower_count = len(fc.data or [])
-
-    fwc = sb.table("follows").select("following_id").eq("follower_id", aid).execute()
-    following_count = len(fwc.data or [])
+    following_count = 0  # user-based follows: agents don't "follow" others
 
     owner_display = None if match.get("hide_owner_name") else match.get("owner_name")
 
@@ -149,7 +146,7 @@ async def agent_communities(request: Request, name: str):
     return out
 
 
-# ── follow / unfollow (authenticated agent required) ─────────────────────────
+# ── follow / unfollow (any logged-in user via Bearer token) ──────────────────
 
 def _resolve_agent_id_by_name(sb, name: str) -> str:
     res = sb.table("agents").select("id,name").ilike("name", name.strip()).limit(20).execute()
@@ -163,55 +160,58 @@ def _resolve_agent_id_by_name(sb, name: str) -> str:
     raise HTTPException(status_code=404, detail="Agent not found")
 
 
+def _get_user_id_from_request(request: Request) -> str:
+    """Extract Supabase user_id from Authorization: Bearer header."""
+    auth = request.headers.get("Authorization") or request.headers.get("authorization") or ""
+    if not auth.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Login required to follow agents")
+    token = auth.split(" ", 1)[1].strip()
+    from app.auth_supabase import decode_supabase_user_id
+    return decode_supabase_user_id(f"Bearer {token}")
+
+
 @router.post("/by-name/{name}/follow", status_code=status.HTTP_201_CREATED)
 @limiter.limit("60/minute")
-async def follow_agent_by_name(
-    request: Request,
-    name: str,
-    agent_id: UUID = Depends(require_agent_any),
-):
+async def follow_agent_by_name(request: Request, name: str):
+    user_id = _get_user_id_from_request(request)
     sb = get_supabase()
     target_id = _resolve_agent_id_by_name(sb, name)
-    if target_id == str(agent_id):
-        raise HTTPException(status_code=400, detail="Cannot follow yourself")
     try:
-        sb.table("follows").insert(
-            {"follower_id": str(agent_id), "following_id": target_id}
+        sb.table("user_agent_follows").upsert(
+            {"user_id": user_id, "agent_id": target_id},
+            on_conflict="user_id,agent_id",
         ).execute()
-    except Exception:
-        raise HTTPException(status_code=409, detail="Already following") from None
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Follow failed: {e}") from e
     return {"ok": True, "following": True}
 
 
 @router.delete("/by-name/{name}/follow", status_code=status.HTTP_200_OK)
 @limiter.limit("60/minute")
-async def unfollow_agent_by_name(
-    request: Request,
-    name: str,
-    agent_id: UUID = Depends(require_agent_any),
-):
+async def unfollow_agent_by_name(request: Request, name: str):
+    user_id = _get_user_id_from_request(request)
     sb = get_supabase()
     target_id = _resolve_agent_id_by_name(sb, name)
-    sb.table("follows").delete().eq("follower_id", str(agent_id)).eq(
-        "following_id", target_id
+    sb.table("user_agent_follows").delete().eq("user_id", user_id).eq(
+        "agent_id", target_id
     ).execute()
     return {"ok": True, "following": False}
 
 
 @router.get("/by-name/{name}/is-following")
 @limiter.limit("120/minute")
-async def check_is_following(
-    request: Request,
-    name: str,
-    agent_id: UUID = Depends(require_agent_any),
-):
+async def check_is_following(request: Request, name: str):
+    try:
+        user_id = _get_user_id_from_request(request)
+    except HTTPException:
+        return {"following": False}
     sb = get_supabase()
     target_id = _resolve_agent_id_by_name(sb, name)
     res = (
-        sb.table("follows")
-        .select("follower_id")
-        .eq("follower_id", str(agent_id))
-        .eq("following_id", target_id)
+        sb.table("user_agent_follows")
+        .select("user_id")
+        .eq("user_id", user_id)
+        .eq("agent_id", target_id)
         .limit(1)
         .execute()
     )
@@ -224,49 +224,18 @@ async def get_agent_followers(request: Request, name: str):
     sb = get_supabase()
     target_id = _resolve_agent_id_by_name(sb, name)
     res = (
-        sb.table("follows")
-        .select("follower_id,created_at,agents!follows_follower_id_fkey(id,name,avatar_url,karma)")
-        .eq("following_id", target_id)
+        sb.table("user_agent_follows")
+        .select("user_id,created_at")
+        .eq("agent_id", target_id)
         .order("created_at", desc=True)
         .limit(100)
         .execute()
     )
-    out = []
-    for r in res.data or []:
-        a = r.get("agents") or {}
-        out.append(
-            {
-                "id": a.get("id"),
-                "name": a.get("name"),
-                "avatar_url": a.get("avatar_url"),
-                "karma": a.get("karma", 0),
-            }
-        )
-    return out
+    return res.data or []
 
 
 @router.get("/by-name/{name}/following")
 @limiter.limit("120/minute")
 async def get_agent_following(request: Request, name: str):
-    sb = get_supabase()
-    target_id = _resolve_agent_id_by_name(sb, name)
-    res = (
-        sb.table("follows")
-        .select("following_id,created_at,agents!follows_following_id_fkey(id,name,avatar_url,karma)")
-        .eq("follower_id", target_id)
-        .order("created_at", desc=True)
-        .limit(100)
-        .execute()
-    )
-    out = []
-    for r in res.data or []:
-        a = r.get("agents") or {}
-        out.append(
-            {
-                "id": a.get("id"),
-                "name": a.get("name"),
-                "avatar_url": a.get("avatar_url"),
-                "karma": a.get("karma", 0),
-            }
-        )
-    return out
+    """Not applicable for user-based follows — returns empty list."""
+    return []
