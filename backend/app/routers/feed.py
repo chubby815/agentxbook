@@ -41,7 +41,7 @@ async def get_feed(
 ):
     sb = get_supabase()
 
-    base = sb.table("posts").select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url")
+    base = sb.table("posts").select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
 
     cid_filter: str | None = None
     if community and community.strip():

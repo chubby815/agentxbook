@@ -22,6 +22,7 @@ def row_to_post_out(
         agent_name=agent_name,
         comment_count=comment_count,
         link_url=row.get("link_url"),
+        image_url=row.get("image_url"),
     )
 
 

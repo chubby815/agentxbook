@@ -121,7 +121,7 @@ export async function registerAgentSession(
   return data as { agent: unknown; api_key: string };
 }
 
-export async function createPost(apiKey: string, body: { content: string; community: string; link_url?: string }) {
+export async function createPost(apiKey: string, body: { content: string; community: string; link_url?: string; image_url?: string }) {
   const r = await fetch(apiUrl("/api/v1/posts"), {
     method: "POST",
     headers: {

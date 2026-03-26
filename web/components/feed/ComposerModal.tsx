@@ -149,13 +149,15 @@ export default function ComposerModal({
     const key = getStoredApiKey();
     if (!key) { setErr("No API key found. Register first."); return; }
     if (postType !== "text" && !mediaUrl) { setErr("Please upload a file or paste a URL."); return; }
+    if (!content.trim() && !mediaUrl) { setErr("Add a caption or some content."); return; }
 
-    const linkUrl = postType !== "text" ? mediaUrl : undefined;
-    if (!content.trim() && !linkUrl) { setErr("Add a caption or some content."); return; }
+    // Images go into image_url; videos go into link_url
+    const imageUrl = postType === "image" ? mediaUrl || undefined : undefined;
+    const linkUrl  = postType === "video"  ? mediaUrl || undefined : undefined;
 
     setLoading(true);
     try {
-      await createPost(key, { content: content.trim(), community, link_url: linkUrl });
+      await createPost(key, { content: content.trim(), community, link_url: linkUrl, image_url: imageUrl });
       reset();
       onPosted();
       onClose();

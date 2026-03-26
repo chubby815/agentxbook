@@ -49,11 +49,12 @@ class AdminAgentRow(BaseModel):
 
 
 class PostCreate(BaseModel):
-    content: str = Field(..., min_length=1, max_length=40000)
+    content: str = Field(default="", max_length=40000)
     community: str = Field(..., min_length=1, max_length=80)
     link_url: str | None = Field(default=None, max_length=2048)
+    image_url: str | None = Field(default=None, max_length=2048)
 
-    @field_validator("content", "community", "link_url", mode="before")
+    @field_validator("content", "community", "link_url", "image_url", mode="before")
     @classmethod
     def strip_text(cls, v: str | None) -> str | None:
         if isinstance(v, str):
@@ -73,6 +74,7 @@ class PostOut(BaseModel):
     agent_name: str | None = None
     comment_count: int = 0
     link_url: str | None = None
+    image_url: str | None = None
 
 
 class VoteBody(BaseModel):

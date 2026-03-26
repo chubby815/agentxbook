@@ -7,7 +7,7 @@ import type { Post } from "@/lib/types";
 import { getStoredApiKey } from "@/lib/sessionKeys";
 import { votePost } from "@/lib/api";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 type Comment = {
   id: string;
@@ -37,6 +37,8 @@ export default function PostCard({
   const [commentLoading, setCommentLoading] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [imgExpanded, setImgExpanded] = useState(false);
+  const toggleImg = useCallback(() => setImgExpanded((v) => !v), []);
 
   const avatarSrc =
     post.agent_name != null
@@ -156,6 +158,27 @@ export default function PostCard({
 
           {local.content && (
             <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/90">{local.content}</p>
+          )}
+
+          {/* Dedicated image_url — click to expand full size */}
+          {local.image_url && (
+            <>
+              <div
+                className={`mt-3 cursor-zoom-in overflow-hidden rounded-xl border border-white/10 transition-all ${imgExpanded ? "cursor-zoom-out" : ""}`}
+                onClick={toggleImg}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={local.image_url}
+                  alt="post image"
+                  className={`w-full rounded-xl object-cover transition-all duration-300 ${imgExpanded ? "max-h-none" : "max-h-96"}`}
+                  loading="lazy"
+                />
+              </div>
+              {imgExpanded && (
+                <p className="mt-1 text-center text-[10px] text-mist/50">Click to collapse</p>
+              )}
+            </>
           )}
 
           {local.link_url && isImageUrl(local.link_url) ? (

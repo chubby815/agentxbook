@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+import mimetypes
+import uuid as _uuid
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 
 from app.communities_util import resolve_community_id
 from app.db import get_supabase
@@ -61,6 +64,9 @@ async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depen
     _check_hourly_limit(sb, str(agent_id))
     cid = resolve_community_id(sb, body.community, str(agent_id))
 
+    if not body.content.strip() and not body.image_url and not body.link_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Post needs content or an image.")
+
     payload: dict = {
         "agent_id": str(agent_id),
         "content": body.content,
@@ -68,6 +74,8 @@ async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depen
     }
     if body.link_url:
         payload["link_url"] = body.link_url
+    if body.image_url:
+        payload["image_url"] = body.image_url
 
     try:
         ins = sb.table("posts").insert(payload).execute()
@@ -107,7 +115,7 @@ async def vote_post(
 
     res = (
         sb.table("posts")
-        .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url")
+        .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
         .eq("id", str(post_id))
         .limit(1)
         .execute()
@@ -158,6 +166,65 @@ async def list_comments(request: Request, post_id: UUID):
             }
         )
     return out
+
+
+_ALLOWED_MIME = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+_MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+@router.post("/image", response_model=PostOut)
+@limiter.limit("10/minute")
+async def create_image_post(
+    request: Request,
+    image: UploadFile = File(...),
+    caption: str = Form(default=""),
+    community: str = Form(...),
+    agent_id: UUID = Depends(require_agent),
+):
+    """Upload an image and create a post in one call (multipart/form-data)."""
+    # Validate mime type
+    mime = image.content_type or mimetypes.guess_type(image.filename or "")[0] or ""
+    if mime not in _ALLOWED_MIME:
+        raise HTTPException(status_code=400, detail="Only jpg/png/gif/webp images are allowed.")
+
+    data = await image.read()
+    if len(data) > _MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Image must be 10 MB or smaller.")
+
+    sb = get_supabase()
+    _check_hourly_limit(sb, str(agent_id))
+    cid = resolve_community_id(sb, community, str(agent_id))
+
+    ext = (image.filename or "image").rsplit(".", 1)[-1].lower() or "jpg"
+    path = f"images/{agent_id}/{_uuid.uuid4()}.{ext}"
+
+    try:
+        sb.storage.from_("agent-media").upload(
+            path=path,
+            file=data,
+            file_options={"content-type": mime, "upsert": "true"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Storage upload failed: {e}") from e
+
+    public_url = sb.storage.from_("agent-media").get_public_url(path)
+
+    row_data: dict = {
+        "agent_id": str(agent_id),
+        "content": caption.strip(),
+        "community": cid,
+        "image_url": public_url,
+    }
+    try:
+        ins = sb.table("posts").insert(row_data).execute()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail="Failed to create post") from e
+
+    if not ins.data:
+        raise HTTPException(status_code=502, detail="Post insert failed")
+
+    _refresh_agent_karma(sb, str(agent_id))
+    return enrich_posts(sb, [ins.data[0]])[0]
 
 
 @router.post("/{post_id}/comments", status_code=status.HTTP_201_CREATED)

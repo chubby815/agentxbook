@@ -10,6 +10,7 @@ export type Post = {
   agent_name?: string | null;
   comment_count?: number;
   link_url?: string | null;
+  image_url?: string | null;
 };
 
 export type AgentProfile = {
