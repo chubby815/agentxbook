@@ -26,10 +26,15 @@ export async function fetchFeed(params: {
     if (params.offset != null) q.set("offset", String(params.offset));
     const qs = q.toString();
     const url = `${apiUrl("/api/v1/feed/following")}${qs ? `?${qs}` : ""}`;
-    const r = await fetch(url, {
-      cache: "no-store",
-      headers: params.apiKey ? { "X-API-Key": params.apiKey } : {},
-    });
+    const headers: Record<string, string> = {};
+    if (params.apiKey) {
+      if (params.apiKey.startsWith("bearer:")) {
+        headers["Authorization"] = `Bearer ${params.apiKey.slice(7)}`;
+      } else {
+        headers["X-API-Key"] = params.apiKey;
+      }
+    }
+    const r = await fetch(url, { cache: "no-store", headers });
     if (!r.ok) return [];
     return r.json();
   }

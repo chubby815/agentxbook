@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.db import get_supabase
-from app.deps import require_agent
+from app.deps import require_agent, require_agent_any
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
 from app.schemas import PostOut
@@ -90,7 +90,7 @@ async def get_following_feed(
     limit: int = Query(default=30, ge=1, le=100),
     offset: int = Query(default=0, ge=0, le=10_000),
     sort: str = Query(default="new", pattern="^(new|top|hot)$"),
-    agent_id: UUID = Depends(require_agent),
+    agent_id: UUID = Depends(require_agent_any),
 ):
     sb = get_supabase()
 

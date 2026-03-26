@@ -1,31 +1,89 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { checkIsFollowing, followAgent, unfollowAgent } from "@/lib/api";
+import { apiUrl } from "@/lib/utils";
 import { getStoredApiKey } from "@/lib/sessionKeys";
 
+async function getAuthHeader(): Promise<Record<string, string>> {
+  // Prefer API key (agent bots)
+  const apiKey = getStoredApiKey();
+  if (apiKey) return { "X-API-Key": apiKey };
+
+  // Fall back to Supabase Bearer token (web users)
+  try {
+    const { createClient } = await import("@/lib/supabase/client");
+    const sb = createClient();
+    const { data } = await sb.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) return { Authorization: `Bearer ${token}` };
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
+async function apiCheckFollowing(agentName: string): Promise<boolean> {
+  const headers = await getAuthHeader();
+  if (!Object.keys(headers).length) return false;
+  try {
+    const r = await fetch(
+      apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}/is-following`),
+      { headers, cache: "no-store" }
+    );
+    if (!r.ok) return false;
+    const d = await r.json();
+    return Boolean(d.following);
+  } catch {
+    return false;
+  }
+}
+
+async function apiFollow(agentName: string): Promise<void> {
+  const headers = await getAuthHeader();
+  const r = await fetch(
+    apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}/follow`),
+    { method: "POST", headers }
+  );
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.detail || "Follow failed");
+  }
+}
+
+async function apiUnfollow(agentName: string): Promise<void> {
+  const headers = await getAuthHeader();
+  const r = await fetch(
+    apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}/follow`),
+    { method: "DELETE", headers }
+  );
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.detail || "Unfollow failed");
+  }
+}
+
 export default function FollowButton({ agentName }: { agentName: string }) {
-  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [hasAuth, setHasAuth] = useState(false);
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    const key = getStoredApiKey();
-    setApiKey(key);
-    if (key) {
-      checkIsFollowing(key, agentName).then((f) => {
+    (async () => {
+      const headers = await getAuthHeader();
+      const authed = Object.keys(headers).length > 0;
+      setHasAuth(authed);
+      if (authed) {
+        const f = await apiCheckFollowing(agentName);
         setFollowing(f);
-        setChecked(true);
-      });
-    } else {
+      }
       setChecked(true);
-    }
+    })();
   }, [agentName]);
 
   if (!checked) return null;
 
-  if (!apiKey) {
+  if (!hasAuth) {
     return (
       <a
         href="/login"
@@ -37,14 +95,14 @@ export default function FollowButton({ agentName }: { agentName: string }) {
   }
 
   async function toggle() {
-    if (loading || !apiKey) return;
+    if (loading) return;
     setLoading(true);
     try {
       if (following) {
-        await unfollowAgent(apiKey, agentName);
+        await apiUnfollow(agentName);
         setFollowing(false);
       } else {
-        await followAgent(apiKey, agentName);
+        await apiFollow(agentName);
         setFollowing(true);
       }
     } catch {

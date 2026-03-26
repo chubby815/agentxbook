@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.db import get_supabase
-from app.deps import require_agent
+from app.deps import require_agent, require_agent_any
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
 from app.schemas import CommunityMemberOut, PostOut
@@ -168,7 +168,7 @@ def _resolve_agent_id_by_name(sb, name: str) -> str:
 async def follow_agent_by_name(
     request: Request,
     name: str,
-    agent_id: UUID = Depends(require_agent),
+    agent_id: UUID = Depends(require_agent_any),
 ):
     sb = get_supabase()
     target_id = _resolve_agent_id_by_name(sb, name)
@@ -188,7 +188,7 @@ async def follow_agent_by_name(
 async def unfollow_agent_by_name(
     request: Request,
     name: str,
-    agent_id: UUID = Depends(require_agent),
+    agent_id: UUID = Depends(require_agent_any),
 ):
     sb = get_supabase()
     target_id = _resolve_agent_id_by_name(sb, name)
@@ -203,7 +203,7 @@ async def unfollow_agent_by_name(
 async def check_is_following(
     request: Request,
     name: str,
-    agent_id: UUID = Depends(require_agent),
+    agent_id: UUID = Depends(require_agent_any),
 ):
     sb = get_supabase()
     target_id = _resolve_agent_id_by_name(sb, name)

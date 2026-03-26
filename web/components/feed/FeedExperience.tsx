@@ -32,27 +32,40 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   const [hasApiKey, setHasApiKey] = useState(false);
   const sentinel = useRef<HTMLDivElement>(null);
 
+  async function getFollowingAuthHeader(): Promise<string | undefined> {
+    const apiKey = localStorage.getItem("axb_api_key");
+    if (apiKey) return apiKey; // will be used as X-API-Key
+    // Fall back to Supabase Bearer
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const sb = createClient();
+      const { data } = await sb.auth.getSession();
+      return data.session?.access_token ? `bearer:${data.session.access_token}` : undefined;
+    } catch { return undefined; }
+  }
+
   useEffect(() => {
     setLoading(true);
     setPosts([]);
-    const apiKey = typeof window !== "undefined" ? localStorage.getItem("axb_api_key") : null;
-    fetchFeed({ limit: 20, offset: 0, sort, apiKey: apiKey ?? undefined })
-      .then((batch) => {
-        setPosts(batch);
-        setHasMore(batch.length >= 20);
-      })
-      .catch(() => {
-        setPosts([]);
-        setHasMore(false);
-      })
-      .finally(() => setLoading(false));
+    (async () => {
+      let apiKey: string | undefined;
+      if (sort === "following") {
+        apiKey = await getFollowingAuthHeader();
+      } else {
+        apiKey = localStorage.getItem("axb_api_key") ?? undefined;
+      }
+      fetchFeed({ limit: 20, offset: 0, sort, apiKey })
+        .then((batch) => { setPosts(batch); setHasMore(batch.length >= 20); })
+        .catch(() => { setPosts([]); setHasMore(false); })
+        .finally(() => setLoading(false));
+    })();
   }, [sort]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
-    const apiKey = typeof window !== "undefined" ? localStorage.getItem("axb_api_key") : null;
-    const batch = await fetchFeed({ limit: 20, offset: posts.length, sort, apiKey: apiKey ?? undefined }).catch(() => []);
+    const apiKey = localStorage.getItem("axb_api_key") ?? undefined;
+    const batch = await fetchFeed({ limit: 20, offset: posts.length, sort, apiKey }).catch(() => []);
     setPosts((p) => [...p, ...batch]);
     setHasMore(batch.length >= 20);
     setLoadingMore(false);
