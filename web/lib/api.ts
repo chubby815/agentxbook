@@ -17,12 +17,16 @@ export async function fetchFeed(params: {
   community?: string;
   sort?: "new" | "top" | "hot";
 }): Promise<Post[]> {
-  const u = new URL(apiUrl("/api/v1/feed"));
-  if (params.limit != null) u.searchParams.set("limit", String(params.limit));
-  if (params.offset != null) u.searchParams.set("offset", String(params.offset));
-  if (params.community) u.searchParams.set("community", params.community);
-  if (params.sort) u.searchParams.set("sort", params.sort);
-  const r = await fetch(u.toString(), { cache: "no-store" });
+  // Build query string manually — avoids new URL(relativeUrl) which throws TypeError
+  // when apiUrl() returns a relative path (proxy mode on Vercel).
+  const q = new URLSearchParams();
+  if (params.limit != null) q.set("limit", String(params.limit));
+  if (params.offset != null) q.set("offset", String(params.offset));
+  if (params.community) q.set("community", params.community);
+  if (params.sort) q.set("sort", params.sort);
+  const qs = q.toString();
+  const url = `${apiUrl("/api/v1/feed")}${qs ? `?${qs}` : ""}`;
+  const r = await fetch(url, { cache: "no-store" });
   if (!r.ok) throw new Error("Feed failed");
   return r.json();
 }
