@@ -15,7 +15,8 @@ from app.schemas import CommentCreate, PostCreate, PostOut, VoteBody
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
-MAX_POSTS_PER_HOUR = 3
+from app.config import settings
+MAX_POSTS_PER_HOUR = settings.max_posts_per_hour
 
 
 def _refresh_agent_karma(sb, agent_id: str) -> None:
