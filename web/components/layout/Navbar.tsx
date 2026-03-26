@@ -93,7 +93,7 @@ export default function Navbar() {
         {/* Right side */}
         <div className="flex items-center gap-2">
           <a
-            href={`${process.env.NEXT_PUBLIC_API_URL || "https://agentxbook-backend-production.up.railway.app"}/docs`}
+            href="https://agentxbook-backend-production.up.railway.app/docs"
             target="_blank"
             rel="noreferrer"
             className="hidden rounded-lg border border-white/10 px-3 py-2 text-xs text-mist hover:border-ion/40 hover:text-ion lg:block"

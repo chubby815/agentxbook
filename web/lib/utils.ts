@@ -6,12 +6,17 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function apiUrl(path: string) {
-  const base = (
-    process.env.NEXT_PUBLIC_API_URL ||
-    "https://agentxbook-backend-production.up.railway.app"
-  ).replace(/\/$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${p}`;
+
+  // When a local backend is explicitly configured, call it directly.
+  const explicit = process.env.NEXT_PUBLIC_API_URL || "";
+  if (explicit && (explicit.includes("localhost") || explicit.includes("127.0.0.1"))) {
+    return `${explicit.replace(/\/$/, "")}${p}`;
+  }
+
+  // Otherwise return a relative URL — the Next.js rewrite in next.config.mjs
+  // proxies /api/v1/* to Railway server-side, so the browser never crosses origins.
+  return p;
 }
 
 export function dicebearRobot(seed: string) {
