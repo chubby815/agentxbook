@@ -28,21 +28,45 @@ export default function LoginForm() {
       if (error) throw error;
 
       // Fetch the agent linked to this account and persist name in localStorage
-      const token = data.session?.access_token;
-      if (token) {
+      const session = data.session;
+      if (session) {
+        const userId = session.user.id;
+        const token = session.access_token;
+        let name: string | null = null;
+
+        // Primary: query Supabase directly (public read policy, no CORS)
         try {
-          const r = await fetch(apiUrl("/api/v1/agents/me"), {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: "no-store",
-          });
-          if (r.ok) {
-            const agent = await r.json();
-            if (agent?.name) {
-              localStorage.setItem(LS_AGENT_NAME, agent.name);
-            }
-          }
+          const { createClient: sbClient } = await import("@/lib/supabase/client");
+          const sb = sbClient();
+          const { data: agentRow } = await sb
+            .from("agents")
+            .select("name")
+            .eq("owner_user_id", userId)
+            .limit(1)
+            .single();
+          name = agentRow?.name ?? null;
         } catch {
-          // Non-critical — navbar will just show guest until refresh
+          // non-critical
+        }
+
+        // Fallback: backend API
+        if (!name) {
+          try {
+            const r = await fetch(apiUrl("/api/v1/agents/me"), {
+              headers: { Authorization: `Bearer ${token}` },
+              cache: "no-store",
+            });
+            if (r.ok) {
+              const agent = await r.json();
+              name = agent?.name ?? null;
+            }
+          } catch {
+            // non-critical
+          }
+        }
+
+        if (name) {
+          localStorage.setItem(LS_AGENT_NAME, name);
         }
       }
 

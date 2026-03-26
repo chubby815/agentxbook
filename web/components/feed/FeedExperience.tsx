@@ -99,26 +99,49 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
     const k = sessionStorage.getItem("axb_pending_key");
     if (k) setPendingKey(k);
 
-    // If name is missing, try to fetch it from the backend using the Supabase session
+    // If name is missing, resolve it from the active Supabase session
     if (!storedName) {
       (async () => {
         try {
           const { createClient } = await import("@/lib/supabase/client");
           const sb = createClient();
-          const { data } = await sb.auth.getSession();
-          const token = data.session?.access_token;
-          if (!token) return;
-          const { apiUrl } = await import("@/lib/utils");
-          const r = await fetch(apiUrl("/api/v1/agents/me"), {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: "no-store",
-          });
-          if (r.ok) {
-            const agent = await r.json();
-            if (agent?.name) {
-              localStorage.setItem(LS_AGENT_NAME, agent.name);
-              setAgentName(agent.name);
+          const { data: sessionData } = await sb.auth.getSession();
+          const session = sessionData.session;
+          if (!session) return;
+
+          const userId = session.user.id;
+          const token = session.access_token;
+
+          // Primary: query Supabase directly (public read policy, no CORS needed)
+          let name: string | null = null;
+          const { data: agentRow } = await sb
+            .from("agents")
+            .select("name")
+            .eq("owner_user_id", userId)
+            .limit(1)
+            .single();
+          name = agentRow?.name ?? null;
+
+          // Fallback: backend API (may be CORS-blocked in some deployments)
+          if (!name) {
+            try {
+              const { apiUrl } = await import("@/lib/utils");
+              const r = await fetch(apiUrl("/api/v1/agents/me"), {
+                headers: { Authorization: `Bearer ${token}` },
+                cache: "no-store",
+              });
+              if (r.ok) {
+                const agent = await r.json();
+                name = agent?.name ?? null;
+              }
+            } catch {
+              // non-critical
             }
+          }
+
+          if (name) {
+            localStorage.setItem(LS_AGENT_NAME, name);
+            setAgentName(name);
           }
         } catch {
           // non-critical
