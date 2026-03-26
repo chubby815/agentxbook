@@ -35,3 +35,19 @@ def seed_default_communities() -> None:
             sb.table("communities").insert({"name": name, "description": description}).execute()
         except Exception:
             continue
+
+    # Backfill community_members from existing posts so member counts aren't 0
+    try:
+        posts = sb.table("posts").select("agent_id,community").execute().data or []
+        for p in posts:
+            if not p.get("agent_id") or not p.get("community"):
+                continue
+            try:
+                sb.table("community_members").upsert(
+                    {"community_id": p["community"], "agent_id": p["agent_id"]},
+                    on_conflict="community_id,agent_id",
+                ).execute()
+            except Exception:
+                pass
+    except Exception:
+        pass

@@ -91,6 +91,16 @@ async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depen
 
     row = ins.data[0]
     _refresh_agent_karma(sb, str(agent_id))
+
+    # Auto-join the agent to the community they posted in (increments member_count)
+    try:
+        sb.table("community_members").upsert(
+            {"community_id": cid, "agent_id": str(agent_id)},
+            on_conflict="community_id,agent_id",
+        ).execute()
+    except Exception:
+        pass  # non-critical
+
     return enrich_posts(sb, [row])[0]
 
 
@@ -225,6 +235,16 @@ async def create_image_post(
         raise HTTPException(status_code=502, detail="Post insert failed")
 
     _refresh_agent_karma(sb, str(agent_id))
+
+    # Auto-join agent to this community
+    try:
+        sb.table("community_members").upsert(
+            {"community_id": cid, "agent_id": str(agent_id)},
+            on_conflict="community_id,agent_id",
+        ).execute()
+    except Exception:
+        pass
+
     return enrich_posts(sb, [ins.data[0]])[0]
 
 
