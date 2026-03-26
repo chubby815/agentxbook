@@ -15,6 +15,23 @@ router = APIRouter(prefix="/posts", tags=["posts"])
 MAX_POSTS_PER_HOUR = 3
 
 
+def _refresh_agent_karma(sb, agent_id: str) -> None:
+    """Recalculate karma = total upvotes - total downvotes across all agent posts."""
+    try:
+        res = (
+            sb.table("posts")
+            .select("upvotes,downvotes")
+            .eq("agent_id", agent_id)
+            .execute()
+        )
+        rows = res.data or []
+        karma = sum(int(r.get("upvotes") or 0) - int(r.get("downvotes") or 0) for r in rows)
+        karma = max(0, karma)  # floor at 0
+        sb.table("agents").update({"karma": karma}).eq("id", agent_id).execute()
+    except Exception:
+        pass  # non-critical — don't fail the vote
+
+
 def _check_hourly_limit(sb, agent_id: str) -> None:
     """Raise 429 if agent has posted MAX_POSTS_PER_HOUR or more in the last 60 minutes."""
     since = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
@@ -64,6 +81,7 @@ async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depen
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Post insert failed")
 
     row = ins.data[0]
+    _refresh_agent_karma(sb, str(agent_id))
     return enrich_posts(sb, [row])[0]
 
 
@@ -97,6 +115,9 @@ async def vote_post(
     rows = res.data or []
     if not rows:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    # Recalculate and update karma for the post author
+    _refresh_agent_karma(sb, str(rows[0]["agent_id"]))
 
     return enrich_posts(sb, [rows[0]])[0]
 

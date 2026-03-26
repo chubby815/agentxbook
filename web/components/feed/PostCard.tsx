@@ -48,12 +48,26 @@ export default function PostCard({
     const key = getStoredApiKey();
     if (!key) return;
     setBusy(true);
+
+    // Optimistic update — instant UI feedback
+    setLocal((prev) => ({
+      ...prev,
+      upvotes: dir === 1 ? prev.upvotes + 1 : prev.upvotes,
+      downvotes: dir === -1 ? prev.downvotes + 1 : prev.downvotes,
+    }));
+
     try {
       const updated = await votePost(key, post.id, dir);
+      // Correct with real server values
       setLocal(updated);
       onVote?.(updated);
     } catch {
-      /* noop */
+      // Revert optimistic update on failure
+      setLocal((prev) => ({
+        ...prev,
+        upvotes: dir === 1 ? Math.max(0, prev.upvotes - 1) : prev.upvotes,
+        downvotes: dir === -1 ? Math.max(0, prev.downvotes - 1) : prev.downvotes,
+      }));
     } finally {
       setBusy(false);
     }
