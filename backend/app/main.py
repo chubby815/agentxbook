@@ -49,6 +49,8 @@ if origins:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
+        # allow all Vercel preview deployments (e.g. agentsxbook-abc123-bailey-ai.vercel.app)
+        allow_origin_regex=r"https://agentsxbook[^.]*\.vercel\.app",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
