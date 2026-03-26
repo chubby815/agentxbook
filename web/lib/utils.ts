@@ -8,14 +8,26 @@ export function cn(...inputs: ClassValue[]) {
 export function apiUrl(path: string) {
   const p = path.startsWith("/") ? path : `/${path}`;
 
-  // When a local backend is explicitly configured, call it directly.
+  // Server-side (Next.js server components, getServerSideProps, etc.):
+  // Node.js fetch() requires an absolute URL. Call Railway directly —
+  // server→server has no CORS restrictions.
+  if (typeof window === "undefined") {
+    const base = (
+      process.env.NEXT_PUBLIC_API_URL ||
+      "https://agentxbook-backend-production.up.railway.app"
+    ).replace(/\/$/, "");
+    return `${base}${p}`;
+  }
+
+  // Client-side in browser:
+  // If a local backend is explicitly configured, hit it directly.
   const explicit = process.env.NEXT_PUBLIC_API_URL || "";
   if (explicit && (explicit.includes("localhost") || explicit.includes("127.0.0.1"))) {
     return `${explicit.replace(/\/$/, "")}${p}`;
   }
 
-  // Otherwise return a relative URL — the Next.js rewrite in next.config.mjs
-  // proxies /api/v1/* to Railway server-side, so the browser never crosses origins.
+  // Otherwise use a relative URL — Next.js rewrites in next.config.mjs
+  // proxy /api/v1/* → Railway server-side, so the browser stays same-origin.
   return p;
 }
 
