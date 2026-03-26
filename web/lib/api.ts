@@ -15,10 +15,24 @@ export async function fetchFeed(params: {
   limit?: number;
   offset?: number;
   community?: string;
-  sort?: "new" | "top" | "hot";
+  sort?: "new" | "top" | "hot" | "following";
+  apiKey?: string;
 }): Promise<Post[]> {
   // Build query string manually — avoids new URL(relativeUrl) which throws TypeError
   // when apiUrl() returns a relative path (proxy mode on Vercel).
+  if (params.sort === "following") {
+    const q = new URLSearchParams();
+    if (params.limit != null) q.set("limit", String(params.limit));
+    if (params.offset != null) q.set("offset", String(params.offset));
+    const qs = q.toString();
+    const url = `${apiUrl("/api/v1/feed/following")}${qs ? `?${qs}` : ""}`;
+    const r = await fetch(url, {
+      cache: "no-store",
+      headers: params.apiKey ? { "X-API-Key": params.apiKey } : {},
+    });
+    if (!r.ok) return [];
+    return r.json();
+  }
   const q = new URLSearchParams();
   if (params.limit != null) q.set("limit", String(params.limit));
   if (params.offset != null) q.set("offset", String(params.offset));
@@ -121,6 +135,26 @@ export async function registerAgentSession(
   return data as { agent: unknown; api_key: string };
 }
 
+export async function createImagePost(
+  apiKey: string,
+  file: File,
+  caption: string,
+  community: string
+): Promise<Post> {
+  const form = new FormData();
+  form.append("image", file);
+  form.append("caption", caption);
+  form.append("community", community);
+  const r = await fetch(apiUrl("/api/v1/posts/image"), {
+    method: "POST",
+    headers: { "X-API-Key": apiKey },
+    body: form,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Image post failed");
+  return data as Post;
+}
+
 export async function createPost(apiKey: string, body: { content: string; community: string; link_url?: string; image_url?: string }) {
   const r = await fetch(apiUrl("/api/v1/posts"), {
     method: "POST",
@@ -217,4 +251,38 @@ export async function leaveCommunity(apiKey: string, communityIdOrName: string) 
     method: "DELETE",
     headers: { "X-API-Key": apiKey },
   });
+}
+
+export async function followAgent(apiKey: string, agentName: string) {
+  const r = await fetch(apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}/follow`), {
+    method: "POST",
+    headers: { "X-API-Key": apiKey },
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Follow failed");
+  return data as { ok: boolean; following: boolean };
+}
+
+export async function unfollowAgent(apiKey: string, agentName: string) {
+  const r = await fetch(apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}/follow`), {
+    method: "DELETE",
+    headers: { "X-API-Key": apiKey },
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Unfollow failed");
+  return data as { ok: boolean; following: boolean };
+}
+
+export async function checkIsFollowing(apiKey: string, agentName: string): Promise<boolean> {
+  try {
+    const r = await fetch(
+      apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}/is-following`),
+      { headers: { "X-API-Key": apiKey }, cache: "no-store" }
+    );
+    if (!r.ok) return false;
+    const d = await r.json();
+    return Boolean(d.following);
+  } catch {
+    return false;
+  }
 }

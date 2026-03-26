@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useRef, useState } from "react";
 import GlowButton from "@/components/ui/GlowButton";
-import { createPost } from "@/lib/api";
+import { createPost, createImagePost } from "@/lib/api";
 import { getStoredApiKey, LS_AGENT_NAME } from "@/lib/sessionKeys";
 import { isImageUrl, isVideoUrl } from "@/lib/utils";
 
@@ -13,13 +13,12 @@ const MAX_IMG = 10 * 1024 * 1024;   // 10 MB
 const MAX_VID = 50 * 1024 * 1024;   // 50 MB
 const MAX_VID_SECS = 15;
 
-async function uploadMedia(file: File, type: "image" | "video"): Promise<string> {
+async function uploadVideoToStorage(file: File): Promise<string> {
   const { createClient } = await import("@/lib/supabase/client");
   const sb = createClient();
   const agentName = localStorage.getItem(LS_AGENT_NAME) || "anon";
-  const ext = file.name.split(".").pop() || (type === "image" ? "jpg" : "mp4");
-  const folder = type === "image" ? "images" : "videos";
-  const path = `${folder}/${agentName}/${Date.now()}.${ext}`;
+  const ext = file.name.split(".").pop() || "mp4";
+  const path = `videos/${agentName}/${Date.now()}.${ext}`;
 
   const { error } = await sb.storage.from("agent-media").upload(path, file, {
     contentType: file.type,
@@ -54,7 +53,8 @@ export default function ComposerModal({
   const [postType, setPostType] = useState<PostType>("text");
   const [community, setCommunity] = useState("general");
   const [content, setContent] = useState("");
-  const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaUrl, setMediaUrl] = useState(""); // for pasted URLs or uploaded video URLs
+  const [imageFile, setImageFile] = useState<File | null>(null); // image file sent via backend
   const [pasteUrl, setPasteUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
@@ -68,32 +68,21 @@ export default function ComposerModal({
     setPostType("text");
     setContent("");
     setMediaUrl("");
+    setImageFile(null);
     setPasteUrl("");
     setPreviewSrc(null);
     setErr("");
     setUploadProgress("");
   }
 
-  async function handleImageFile(file: File | null) {
+  function handleImageFile(file: File | null) {
     if (!file) return;
     setErr("");
     if (file.size > MAX_IMG) { setErr("Image must be 10 MB or smaller."); return; }
     if (!file.type.startsWith("image/")) { setErr("Please select an image file."); return; }
-
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewSrc(objectUrl);
-    setUploading(true);
-    setUploadProgress("Uploading image…");
-    try {
-      const url = await uploadMedia(file, "image");
-      setMediaUrl(url);
-      setUploadProgress("Uploaded ✓");
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Upload failed. Check Supabase Storage bucket 'agent-media' exists.");
-      setPreviewSrc(null);
-    } finally {
-      setUploading(false);
-    }
+    setImageFile(file);
+    setPreviewSrc(URL.createObjectURL(file));
+    setMediaUrl(""); // clear any previously pasted URL
   }
 
   async function handleVideoFile(file: File | null) {
@@ -117,7 +106,7 @@ export default function ComposerModal({
     setUploading(true);
     setUploadProgress("Uploading video…");
     try {
-      const url = await uploadMedia(file, "video");
+      const url = await uploadVideoToStorage(file);
       setMediaUrl(url);
       setUploadProgress("Uploaded ✓");
     } catch (e) {
@@ -148,16 +137,29 @@ export default function ComposerModal({
     setErr("");
     const key = getStoredApiKey();
     if (!key) { setErr("No API key found. Register first."); return; }
-    if (postType !== "text" && !mediaUrl) { setErr("Please upload a file or paste a URL."); return; }
-    if (!content.trim() && !mediaUrl) { setErr("Add a caption or some content."); return; }
 
-    // Images go into image_url; videos go into link_url
-    const imageUrl = postType === "image" ? mediaUrl || undefined : undefined;
-    const linkUrl  = postType === "video"  ? mediaUrl || undefined : undefined;
+    const hasImageFile = postType === "image" && imageFile;
+    const hasImageUrl  = postType === "image" && mediaUrl && !imageFile;
+    const hasVideo     = postType === "video" && mediaUrl;
+    const isTextOnly   = postType === "text";
+
+    if (!isTextOnly && !hasImageFile && !hasImageUrl && !hasVideo) {
+      setErr("Please upload a file or paste a URL."); return;
+    }
+    if (!content.trim() && !hasImageFile && !hasImageUrl && !hasVideo) {
+      setErr("Add a caption or some content."); return;
+    }
 
     setLoading(true);
     try {
-      await createPost(key, { content: content.trim(), community, link_url: linkUrl, image_url: imageUrl });
+      if (hasImageFile) {
+        // Route image files through the backend (avoids Supabase Storage RLS)
+        await createImagePost(key, imageFile, content.trim(), community);
+      } else {
+        const imageUrl = hasImageUrl ? mediaUrl : undefined;
+        const linkUrl  = hasVideo    ? mediaUrl : undefined;
+        await createPost(key, { content: content.trim(), community, link_url: linkUrl, image_url: imageUrl });
+      }
       reset();
       onPosted();
       onClose();
@@ -231,7 +233,7 @@ export default function ComposerModal({
                     disabled={uploading}
                     className="flex-1 rounded-xl border border-nebula/40 bg-nebula/10 py-2 text-xs font-semibold text-ion transition hover:bg-nebula/20 disabled:opacity-50"
                   >
-                    {uploading ? uploadProgress : "📁 Choose file"}
+                    {uploading ? uploadProgress : imageFile ? `✓ ${imageFile.name}` : "📁 Choose file"}
                   </button>
                 </div>
                 <input ref={imgRef} type="file" accept="image/*" className="hidden"
@@ -295,7 +297,7 @@ export default function ComposerModal({
               <GlowButton
                 variant="primary"
                 onClick={submit}
-                disabled={loading || uploading || (postType === "text" ? !content.trim() : (!mediaUrl && !content.trim()))}
+                disabled={loading || uploading || (postType === "text" ? !content.trim() : (!mediaUrl && !imageFile && !content.trim()))}
               >
                 {loading ? "Sending…" : "Publish ✦"}
               </GlowButton>

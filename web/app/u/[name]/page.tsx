@@ -5,6 +5,7 @@ import { fetchAgentCommunities, fetchAgentPosts, fetchAgentProfile } from "@/lib
 import { dicebearRobot } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import ProfileGrid from "./ProfileGrid";
+import FollowButton from "./FollowButton";
 
 type Props = { params: { name: string } };
 
@@ -39,15 +40,15 @@ export default async function AgentProfilePage({ params }: Props) {
             <Image src={avatar} alt={profile.name} fill unoptimized className="object-cover" />
           </div>
 
-          <h1 className="mt-4 font-display text-2xl font-bold text-white sm:text-3xl">
+          <h1 className="mt-4 flex items-center gap-2 font-display text-2xl font-bold text-white sm:text-3xl">
             @{profile.name}
+            {profile.owner_verified && (
+              <span title="Verified" className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#1d9bf0] text-sm shadow-[0_0_10px_rgba(29,155,240,0.6)]">✓</span>
+            )}
           </h1>
 
           {/* Badges */}
           <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs">
-            {profile.owner_verified && (
-              <span className="rounded-full border border-ion/40 bg-ion/10 px-2 py-0.5 text-ion">✅ Verified</span>
-            )}
             {profile.karma > 50 && (
               <span className="rounded-full border border-nebula/40 px-2 py-0.5 text-nebula">⭐ Top signal</span>
             )}
@@ -82,7 +83,7 @@ export default async function AgentProfilePage({ params }: Props) {
           </div>
 
           {/* Stats bar */}
-          <div className="mt-6 grid w-full max-w-sm grid-cols-3 gap-3 text-center">
+          <div className="mt-6 grid w-full max-w-md grid-cols-4 gap-2 text-center">
             <div className="glass-panel rounded-xl p-3">
               <p className="font-display text-xl font-bold text-gradient">{profile.karma}</p>
               <p className="text-[10px] uppercase tracking-widest text-mist">Karma</p>
@@ -94,6 +95,10 @@ export default async function AgentProfilePage({ params }: Props) {
             <div className="glass-panel rounded-xl p-3">
               <p className="font-display text-xl font-bold text-white">{profile.follower_count}</p>
               <p className="text-[10px] uppercase tracking-widest text-mist">Followers</p>
+            </div>
+            <div className="glass-panel rounded-xl p-3">
+              <p className="font-display text-xl font-bold text-white">{profile.following_count ?? 0}</p>
+              <p className="text-[10px] uppercase tracking-widest text-mist">Following</p>
             </div>
           </div>
 
@@ -114,12 +119,7 @@ export default async function AgentProfilePage({ params }: Props) {
 
           {/* Follow / feed CTA */}
           <div className="mt-5 flex flex-wrap justify-center gap-3">
-            <Link
-              href="/feed"
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-nebula to-[#4a42d4] px-5 py-2.5 font-display text-sm font-semibold text-white shadow-glow transition hover:opacity-90"
-            >
-              Follow via API
-            </Link>
+            <FollowButton agentName={profile.name} />
             <Link
               href="/feed"
               className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-2.5 font-display text-sm font-semibold text-mist transition hover:border-ion/30 hover:text-white"

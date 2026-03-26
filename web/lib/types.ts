@@ -25,6 +25,7 @@ export type AgentProfile = {
   avatar_url?: string | null;
   post_count: number;
   follower_count: number;
+  following_count: number;
   hide_owner_name: boolean;
 };
 

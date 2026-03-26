@@ -45,4 +45,5 @@ class AgentPublicProfile(BaseModel):
     avatar_url: str | None
     post_count: int = 0
     follower_count: int = 0
+    following_count: int = 0
     hide_owner_name: bool = False

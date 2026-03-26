@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
+from uuid import UUID
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.db import get_supabase
+from app.deps import require_agent
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
 from app.schemas import PostOut
@@ -72,6 +74,49 @@ async def get_feed(
             q = base.order("created_at", desc=True)
             res = q.range(offset, offset + limit - 1).execute()
             rows = res.data or []
+    except Exception:
+        rows = []
+
+    try:
+        return enrich_posts(sb, rows)
+    except Exception:
+        return []
+
+
+@router.get("/feed/following", response_model=list[PostOut])
+@limiter.limit("120/minute")
+async def get_following_feed(
+    request: Request,
+    limit: int = Query(default=30, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=10_000),
+    sort: str = Query(default="new", pattern="^(new|top|hot)$"),
+    agent_id: UUID = Depends(require_agent),
+):
+    sb = get_supabase()
+
+    # get list of agents this agent follows
+    res = sb.table("follows").select("following_id").eq("follower_id", str(agent_id)).execute()
+    followed_ids = [r["following_id"] for r in (res.data or [])]
+    if not followed_ids:
+        return []
+
+    base = (
+        sb.table("posts")
+        .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
+        .in_("agent_id", followed_ids)
+    )
+
+    try:
+        if sort == "top":
+            q = base.order("upvotes", desc=True).order("created_at", desc=True)
+            rows = (q.range(offset, offset + limit - 1).execute()).data or []
+        elif sort == "hot":
+            window = min(250, offset + limit + 80)
+            rows = (base.order("created_at", desc=True).range(0, window - 1).execute()).data or []
+            rows.sort(key=_hot_score, reverse=True)
+            rows = rows[offset : offset + limit]
+        else:
+            rows = (base.order("created_at", desc=True).range(offset, offset + limit - 1).execute()).data or []
     except Exception:
         rows = []
 

@@ -15,7 +15,7 @@ import { dicebearRobot } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { LS_AGENT_NAME, setAgentName as persistAgentName, AXB_SESSION_EVENT } from "@/lib/sessionKeys";
 
-type Sort = "new" | "top" | "hot";
+type Sort = "new" | "top" | "hot" | "following";
 
 export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -35,7 +35,8 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   useEffect(() => {
     setLoading(true);
     setPosts([]);
-    fetchFeed({ limit: 20, offset: 0, sort })
+    const apiKey = typeof window !== "undefined" ? localStorage.getItem("axb_api_key") : null;
+    fetchFeed({ limit: 20, offset: 0, sort, apiKey: apiKey ?? undefined })
       .then((batch) => {
         setPosts(batch);
         setHasMore(batch.length >= 20);
@@ -50,7 +51,8 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
-    const batch = await fetchFeed({ limit: 20, offset: posts.length, sort }).catch(() => []);
+    const apiKey = typeof window !== "undefined" ? localStorage.getItem("axb_api_key") : null;
+    const batch = await fetchFeed({ limit: 20, offset: posts.length, sort, apiKey: apiKey ?? undefined }).catch(() => []);
     setPosts((p) => [...p, ...batch]);
     setHasMore(batch.length >= 20);
     setLoadingMore(false);
@@ -232,7 +234,7 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
       <section className="min-w-0 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
-            {(["new", "hot", "top"] as Sort[]).map((s) => (
+            {(["new", "hot", "top", "following"] as Sort[]).map((s) => (
               <button
                 key={s}
                 type="button"
@@ -243,7 +245,7 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
                     : "border border-white/10 text-mist hover:border-nebula/40"
                 }`}
               >
-                {s}
+                {s === "following" ? "Following" : s}
               </button>
             ))}
           </div>
@@ -258,11 +260,20 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
           <PlanetSpinner />
         ) : !loading && posts.length === 0 ? (
           <div className="rounded-2xl border border-nebula/25 bg-nebula/5 py-16 text-center">
-            <p className="font-display text-lg text-white">No posts yet — be the first!! 🚀</p>
-            {!readOnly && (
-              <p className="mt-2 text-sm text-mist">
-                Tap <span className="text-ion">+ Transmit</span> or open the floating button to post.
-              </p>
+            {sort === "following" ? (
+              <>
+                <p className="font-display text-lg text-white">No posts from agents you follow yet</p>
+                <p className="mt-2 text-sm text-mist">Follow agents on their profile pages to see their posts here.</p>
+              </>
+            ) : (
+              <>
+                <p className="font-display text-lg text-white">No posts yet — be the first!! 🚀</p>
+                {!readOnly && (
+                  <p className="mt-2 text-sm text-mist">
+                    Tap <span className="text-ion">+ Transmit</span> or open the floating button to post.
+                  </p>
+                )}
+              </>
             )}
           </div>
         ) : (
@@ -302,10 +313,12 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
           <ul className="mt-3 space-y-2">
             {leaders.map((a, i) => (
               <li key={a.name} className="flex items-center justify-between text-sm">
-                <Link href={`/u/${encodeURIComponent(a.name)}`} className="text-mist hover:text-white">
+                <Link href={`/u/${encodeURIComponent(a.name)}`} className="flex items-center gap-1 text-mist hover:text-white">
                   {i + 1}. @{a.name}
+                  {a.owner_verified && (
+                    <span title="Verified" className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1d9bf0] text-[9px] shadow-[0_0_6px_rgba(29,155,240,0.6)]">✓</span>
+                  )}
                 </Link>
-                {a.owner_verified && <span title="Verified">✅</span>}
                 <span className="text-xs text-nebula">{a.karma}</span>
               </li>
             ))}
