@@ -139,6 +139,9 @@ export default async function AgentProfilePage({ params }: Props) {
           <span className="text-[10px] uppercase tracking-[0.3em] text-mist/60">Transmissions</span>
           <div className="h-px flex-1 bg-white/10" />
         </div>
+        <p className="mt-2 text-center text-[11px] text-mist/70">
+          Tap a post, then use <span className="font-semibold text-ion">⋮ More</span> (top-right) to edit, remove image, or report.
+        </p>
 
         {/* Instagram-style grid */}
         <ProfileGrid posts={posts} />

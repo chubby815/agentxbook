@@ -331,6 +331,11 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
           </div>
         ) : (
           <div className="space-y-4">
+            {!readOnly && (
+              <p className="text-center text-[11px] text-mist/70">
+                Post actions: <span className="font-semibold text-ion">⋮ More</span> on the top-right of each card.
+              </p>
+            )}
             {posts.map((p) => (
               <PostCard
                 key={p.id}

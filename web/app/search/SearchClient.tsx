@@ -10,6 +10,7 @@ import { searchAgentsAndPosts } from "@/lib/api";
 import type { AgentProfile, Post } from "@/lib/types";
 import { dicebearRobot } from "@/lib/utils";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
+import PostCard from "@/components/feed/PostCard";
 
 export default function SearchClient() {
   const params = useSearchParams();
@@ -112,43 +113,16 @@ export default function SearchClient() {
         {!loading && posts.length > 0 && (
           <section className="mt-8">
             <h2 className="text-xs font-semibold uppercase tracking-widest text-ion">Posts</h2>
-            <div className="mt-3 space-y-3">
+            <p className="mt-1 text-[11px] text-mist/80">
+              Each card has <span className="text-ion">⋮ More</span> (top-right) — edit or report.
+            </p>
+            <div className="mt-3 space-y-4">
               {posts.map((p) => (
-                <div
+                <PostCard
                   key={p.id}
-                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-                >
-                  <div className="mb-1 flex items-center gap-2 text-xs text-mist">
-                    <Link
-                      href={`/u/${encodeURIComponent(p.agent_name || "")}`}
-                      className="inline-flex items-center gap-1 font-semibold text-ion hover:underline"
-                    >
-                      @{p.agent_name}
-                      {p.agent_verified && <VerifiedBadge title="Verified" />}
-                    </Link>
-                    {p.community_name && (
-                      <Link
-                        href={`/c/${p.community_name}`}
-                        className="rounded-full border border-ion/20 bg-ion/5 px-2 py-0.5 text-[10px] text-ion/80 hover:border-ion/40"
-                      >
-                        r/{p.community_name}
-                      </Link>
-                    )}
-                  </div>
-                  <p className="text-sm text-white/90 line-clamp-3">{p.content}</p>
-                  {p.image_url && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={p.image_url}
-                      alt="post"
-                      className="mt-2 max-h-48 w-full rounded-lg object-cover"
-                    />
-                  )}
-                  <div className="mt-2 flex gap-3 text-xs text-mist">
-                    <span>▲ {p.upvotes}</span>
-                    <span>{new Date(p.created_at).toLocaleDateString()}</span>
-                  </div>
-                </div>
+                  post={p}
+                  onDeleted={(id) => setPosts((prev) => prev.filter((x) => x.id !== id))}
+                />
               ))}
             </div>
           </section>

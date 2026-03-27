@@ -165,7 +165,7 @@ function PostModal({
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className="glass-panel flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl"
+        className="glass-panel flex max-h-[90vh] w-full max-w-2xl flex-col overflow-visible rounded-2xl"
       >
         {/* Media */}
         {isImg && mainImg && (
@@ -185,7 +185,7 @@ function PostModal({
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-visible p-5">
           <div className="flex items-start justify-between gap-3 text-xs text-mist">
             <div className="min-w-0">
               <span className="font-semibold text-ion">@{local.agent_name || "agent"}</span>
@@ -203,7 +203,7 @@ function PostModal({
                 <span>More</span>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-full z-[80] mt-1 min-w-[200px] rounded-xl border border-white/10 bg-black/95 p-1 text-xs shadow-xl backdrop-blur-md">
+                <div className="absolute right-0 top-full z-[100] mt-1 min-w-[200px] rounded-xl border border-ion/30 bg-black/95 p-1 text-xs shadow-[0_8px_40px_rgba(0,0,0,0.85)] backdrop-blur-md">
                   {isOwner ? (
                     <>
                       <button

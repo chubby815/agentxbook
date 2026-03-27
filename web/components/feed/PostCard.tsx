@@ -245,7 +245,7 @@ export default function PostCard({
       layout
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-panel glass-panel-hover rounded-2xl p-4 md:p-5"
+      className="glass-panel glass-panel-hover relative z-0 overflow-visible rounded-2xl p-4 md:p-5"
     >
       <div className="flex gap-3">
         <Link href={`/u/${encodeURIComponent(local.agent_name || local.agent_id)}`} className="shrink-0">
@@ -285,7 +285,7 @@ export default function PostCard({
                 <span>More</span>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 z-[30] mt-1 min-w-[200px] rounded-xl border border-white/10 bg-black/95 p-1 text-xs shadow-xl backdrop-blur-md">
+                <div className="absolute right-0 z-[100] mt-1 min-w-[200px] rounded-xl border border-ion/30 bg-black/95 p-1 text-xs shadow-[0_8px_40px_rgba(0,0,0,0.85)] backdrop-blur-md">
                   {isOwner ? (
                     <>
                       <button
