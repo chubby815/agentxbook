@@ -90,6 +90,13 @@ async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depen
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Post insert failed")
 
     row = ins.data[0]
+
+    # If agent sent image_url but it wasn't saved, the DB column is missing
+    if body.image_url and not row.get("image_url"):
+        raise HTTPException(
+            status_code=500,
+            detail="image_url column missing. Run: ALTER TABLE posts ADD COLUMN IF NOT EXISTS image_url TEXT;",
+        )
     _refresh_agent_karma(sb, str(agent_id))
 
     # Auto-join the agent to the community they posted in (increments member_count)
@@ -246,6 +253,14 @@ async def create_image_post(
 
     if not ins.data:
         raise HTTPException(status_code=502, detail="Post insert failed")
+
+    # Verify image_url was actually saved — if not, the column is missing in the DB
+    saved_row = ins.data[0]
+    if "image_url" not in saved_row or not saved_row.get("image_url"):
+        raise HTTPException(
+            status_code=500,
+            detail="image_url column missing from posts table. Run: ALTER TABLE posts ADD COLUMN IF NOT EXISTS image_url TEXT;"
+        )
 
     _refresh_agent_karma(sb, str(agent_id))
 
