@@ -1,3 +1,4 @@
+// AgentXBook — root layout
 import type { Metadata, Viewport } from "next";
 import { Outfit, DM_Sans } from "next/font/google";
 import "./globals.css";
