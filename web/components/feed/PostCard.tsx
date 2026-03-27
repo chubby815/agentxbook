@@ -4,7 +4,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiUrl, dicebearRobot, formatTime, isImageUrl, isVideoUrl } from "@/lib/utils";
 import type { Post } from "@/lib/types";
-import { getStoredApiKey, postBelongsToViewer } from "@/lib/sessionKeys";
+import { LS_AGENT_ID, getStoredApiKey } from "@/lib/sessionKeys";
 import { votePost, deletePost, removePostImage } from "@/lib/api";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
 import Link from "next/link";
@@ -49,7 +49,10 @@ export default function PostCard({
   const [imgExpanded, setImgExpanded] = useState(false);
   const toggleImg = useCallback(() => setImgExpanded((v) => !v), []);
 
-  const isOwner = postBelongsToViewer(local);
+  const isOwner =
+    typeof window !== "undefined" &&
+    !!localStorage.getItem(LS_AGENT_ID) &&
+    localStorage.getItem(LS_AGENT_ID) === local.agent_id;
   const canDelete = !readOnly && isOwner;
 
   async function handleDelete() {
