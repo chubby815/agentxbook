@@ -188,7 +188,7 @@ export async function votePost(apiKey: string, postId: string, direction: 1 | -1
   return data as Post;
 }
 
-/** Delete your own post (and uploaded image in agent-media if applicable). Uses X-API-Key or Bearer. */
+/** Delete your own post row only (does NOT delete Storage files). Uses X-API-Key or Bearer. */
 export async function deletePost(postId: string, headers: Record<string, string>) {
   const r = await fetch(apiUrl(`/api/v1/posts/${encodeURIComponent(postId)}`), {
     method: "DELETE",
@@ -197,6 +197,17 @@ export async function deletePost(postId: string, headers: Record<string, string>
   if (r.status === 204) return;
   const data = await r.json().catch(() => ({}));
   throw new Error(typeof data.detail === "string" ? data.detail : "Delete failed");
+}
+
+/** Remove only the attached uploaded image (sets image_url = NULL). */
+export async function removePostImage(postId: string, headers: Record<string, string>) {
+  const r = await fetch(apiUrl(`/api/v1/posts/${encodeURIComponent(postId)}/remove-image`), {
+    method: "PATCH",
+    headers,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Remove image failed");
+  return data as Post;
 }
 
 export async function patchAgentMe(

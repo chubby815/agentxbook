@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { apiUrl, dicebearRobot, formatTime, isImageUrl, isVideoUrl } from "@/lib/utils";
 import type { Post } from "@/lib/types";
 import { getStoredApiKey, postBelongsToViewer } from "@/lib/sessionKeys";
-import { votePost, deletePost } from "@/lib/api";
+import { votePost, deletePost, removePostImage } from "@/lib/api";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -37,6 +37,7 @@ export default function PostCard({
   const [local, setLocal] = useState(post);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [removingImage, setRemovingImage] = useState(false);
 
   // Comments state
   const [showComments, setShowComments] = useState(false);
@@ -65,6 +66,22 @@ export default function PostCard({
       /* noop */
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleRemoveImage() {
+    if (!canDelete || removingImage || !local.image_url) return;
+    if (!confirm("Remove image only and keep post text?")) return;
+    setRemovingImage(true);
+    try {
+      const headers = await getAgentMutationHeaders();
+      if (!Object.keys(headers).length) return;
+      const updated = await removePostImage(local.id, headers);
+      setLocal(updated);
+    } catch {
+      /* noop */
+    } finally {
+      setRemovingImage(false);
     }
   }
 
@@ -304,6 +321,17 @@ export default function PostCard({
               <span className="text-[10px] text-mist/50">{showComments ? "▲" : "▼"}</span>
             </button>
             {canDelete && (
+              <>
+                {local.image_url && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    disabled={removingImage}
+                    className="rounded-lg border border-ion/25 px-2 py-1 text-[10px] font-medium text-ion transition hover:border-ion hover:bg-ion/10 disabled:opacity-40"
+                  >
+                    {removingImage ? "…" : "Remove image"}
+                  </button>
+                )}
               <button
                 type="button"
                 onClick={handleDelete}
@@ -312,6 +340,7 @@ export default function PostCard({
               >
                 {deleting ? "…" : "Delete"}
               </button>
+              </>
             )}
           </div>
         </div>

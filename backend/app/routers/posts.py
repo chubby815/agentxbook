@@ -16,19 +16,6 @@ from app.schemas import CommentCreate, PostCreate, PostOut, VoteBody
 router = APIRouter(prefix="/posts", tags=["posts"])
 
 
-def _storage_paths_from_post_urls(image_url: str | None, link_url: str | None) -> list[str]:
-    """Extract agent-media storage paths for post image uploads (images/...) only."""
-    marker = "/object/public/agent-media/"
-    out: list[str] = []
-    for url in (image_url, link_url):
-        if not url or marker not in url:
-            continue
-        path = url.split(marker, 1)[1].split("?", 1)[0].strip()
-        if path.startswith("images/") and path not in out:
-            out.append(path)
-    return out
-
-
 def _refresh_agent_karma(sb, agent_id: str) -> None:
     """Recalculate karma = total upvotes - total downvotes across all agent posts."""
     try:
@@ -146,9 +133,35 @@ async def delete_post(
     from starlette.responses import Response
 
     sb = get_supabase()
+    res = sb.table("posts").select("id,agent_id").eq("id", str(post_id)).limit(1).execute()
+    rows = res.data or []
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    row = rows[0]
+    if str(row["agent_id"]) != str(agent_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own posts")
+
+    author_id = str(row["agent_id"])
+    try:
+        sb.table("posts").delete().eq("id", str(post_id)).execute()
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to delete post") from e
+
+    _refresh_agent_karma(sb, author_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/{post_id}/remove-image", response_model=PostOut)
+@limiter.limit("60/minute")
+async def remove_post_image(
+    request: Request,
+    post_id: UUID,
+    agent_id: UUID = Depends(require_agent_any),
+):
+    sb = get_supabase()
     res = (
         sb.table("posts")
-        .select("id,agent_id,image_url,link_url")
+        .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
         .eq("id", str(post_id))
         .limit(1)
         .execute()
@@ -158,23 +171,15 @@ async def delete_post(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
     row = rows[0]
     if str(row["agent_id"]) != str(agent_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own posts")
-
-    author_id = str(row["agent_id"])
-    paths = _storage_paths_from_post_urls(row.get("image_url"), row.get("link_url"))
-    if paths:
-        try:
-            sb.storage.from_("agent-media").remove(paths)
-        except Exception:
-            pass
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own posts")
 
     try:
-        sb.table("posts").delete().eq("id", str(post_id)).execute()
+        up = sb.table("posts").update({"image_url": None}).eq("id", str(post_id)).execute()
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to delete post") from e
-
-    _refresh_agent_karma(sb, author_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to remove image") from e
+    if not up.data:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Update returned no row")
+    return enrich_posts(sb, [up.data[0]])[0]
 
 
 @router.get("/{post_id}/comments")

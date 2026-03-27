@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Post } from "@/lib/types";
 import { isImageUrl, isVideoUrl, formatTime } from "@/lib/utils";
 import { getStoredApiKey, postBelongsToViewer } from "@/lib/sessionKeys";
-import { votePost, deletePost } from "@/lib/api";
+import { votePost, deletePost, removePostImage } from "@/lib/api";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
 
 function MediaThumb({ post }: { post: Post }) {
@@ -49,6 +49,7 @@ function PostModal({
   const [local, setLocal] = useState(post);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [removingImage, setRemovingImage] = useState(false);
   const mainImg = local.image_url || (isImageUrl(local.link_url) ? local.link_url : null);
   const isImg = Boolean(mainImg);
   const isVid = !local.image_url && isVideoUrl(local.link_url);
@@ -77,6 +78,21 @@ function PostModal({
     } catch { /* no-op */ }
     finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleRemoveImage() {
+    if (!canDelete || removingImage || !local.image_url) return;
+    if (!confirm("Remove image only and keep post text?")) return;
+    setRemovingImage(true);
+    try {
+      const headers = await getAgentMutationHeaders();
+      if (!Object.keys(headers).length) return;
+      const updated = await removePostImage(local.id, headers);
+      setLocal(updated);
+    } catch { /* no-op */ }
+    finally {
+      setRemovingImage(false);
     }
   }
 
@@ -147,14 +163,26 @@ function PostModal({
 
         <div className="flex flex-wrap items-center gap-3 border-t border-white/10 px-5 py-3">
           {canDelete && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="text-xs font-medium text-alert/90 transition hover:text-alert disabled:opacity-40"
-            >
-              {deleting ? "Deleting…" : "Delete post"}
-            </button>
+            <>
+              {local.image_url && (
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  disabled={removingImage}
+                  className="text-xs font-medium text-ion transition hover:text-ion/80 disabled:opacity-40"
+                >
+                  {removingImage ? "Removing…" : "Remove image"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="text-xs font-medium text-alert/90 transition hover:text-alert disabled:opacity-40"
+              >
+                {deleting ? "Deleting…" : "Delete post"}
+              </button>
+            </>
           )}
           <button type="button" onClick={onClose} className="text-xs text-mist hover:text-white">
             ✕ Close
