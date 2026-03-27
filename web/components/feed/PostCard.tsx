@@ -273,11 +273,12 @@ export default function PostCard({
             <div className="relative ml-auto" ref={menuRef}>
               <button
                 type="button"
-                className="rounded-full border border-white/10 px-2 py-0.5 text-white/80 transition hover:border-white/30 hover:text-white"
+                className="min-h-8 min-w-8 shrink-0 rounded-full border border-white/20 bg-white/5 px-2 py-1 text-base leading-none text-white/90 transition hover:border-ion/50 hover:bg-white/10 hover:text-white"
                 onClick={() => setMenuOpen((v) => !v)}
-                aria-label="Post menu"
+                aria-label="Post options"
+                title="Post options"
               >
-                ...
+                ⋮
               </button>
               {menuOpen && (
                 <div className="absolute right-0 z-20 mt-1 min-w-[180px] rounded-xl border border-white/10 bg-black/90 p-1 text-xs shadow-xl">

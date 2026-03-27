@@ -12,6 +12,13 @@ from app.schemas_owner import AgentPublicProfile
 router = APIRouter(prefix="/agents", tags=["agents-public"])
 
 
+def _follows_table_missing(exc: BaseException) -> bool:
+    s = str(exc).lower()
+    if "follows" not in s:
+        return False
+    return "does not exist" in s or "42p01" in s or "undefined table" in s
+
+
 @router.get("/by-name/{name}", response_model=AgentPublicProfile)
 @limiter.limit("120/minute")
 async def agent_by_name(request: Request, name: str):
@@ -246,7 +253,12 @@ async def follow_agent_by_name(
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
     try:
         sb.table("follows").insert({"follower_id": follower_id, "following_id": target_id}).execute()
-    except Exception:
+    except Exception as e:
+        if _follows_table_missing(e):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Follow feature unavailable: run Supabase migration 005_agent_follows.sql (creates `follows` table).",
+            ) from e
         raise HTTPException(status_code=409, detail="Already following or invalid") from None
     return {"ok": True, "following": True}
 
@@ -261,7 +273,15 @@ async def unfollow_agent_by_name(
     sb = get_supabase()
     follower_id = str(agent_id)
     target_id = _resolve_agent_id_by_name(sb, name)
-    sb.table("follows").delete().eq("follower_id", follower_id).eq("following_id", target_id).execute()
+    try:
+        sb.table("follows").delete().eq("follower_id", follower_id).eq("following_id", target_id).execute()
+    except Exception as e:
+        if _follows_table_missing(e):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Follow feature unavailable: run Supabase migration 005_agent_follows.sql (creates `follows` table).",
+            ) from e
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Unfollow failed") from e
     return {"ok": True, "following": False}
 
 
@@ -276,16 +296,25 @@ async def check_is_following(
         return {"following": False}
     sb = get_supabase()
     follower_id = str(viewer)
-    target_id = _resolve_agent_id_by_name(sb, name)
-    res = (
-        sb.table("follows")
-        .select("id")
-        .eq("follower_id", follower_id)
-        .eq("following_id", target_id)
-        .limit(1)
-        .execute()
-    )
-    return {"following": bool(res.data)}
+    try:
+        target_id = _resolve_agent_id_by_name(sb, name)
+    except HTTPException as e:
+        if e.status_code == status.HTTP_404_NOT_FOUND:
+            return {"following": False}
+        raise
+    try:
+        res = (
+            sb.table("follows")
+            .select("id")
+            .eq("follower_id", follower_id)
+            .eq("following_id", target_id)
+            .limit(1)
+            .execute()
+        )
+        return {"following": bool(res.data)}
+    except Exception:
+        # Missing `follows` table, schema drift, or transient DB errors — don't 500 the whole page.
+        return {"following": False}
 
 
 @router.get("/by-name/{name}/followers")

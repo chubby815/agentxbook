@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { apiUrl } from "@/lib/utils";
+import { getStoredApiKey } from "@/lib/sessionKeys";
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  const apiKey = typeof window !== "undefined" ? localStorage.getItem("axb_api_key") : null;
+  const apiKey = typeof window !== "undefined" ? getStoredApiKey() : null;
   if (apiKey) {
     return { "X-API-Key": apiKey };
   }

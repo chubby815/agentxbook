@@ -116,3 +116,6 @@ async def optional_agent_any(request: Request) -> Optional[UUID]:
         )
     except HTTPException:
         return None
+    except Exception:
+        # DB/network/JWT edge cases — treat as logged-out for optional endpoints (avoid 500 on e.g. is-following).
+        return None
