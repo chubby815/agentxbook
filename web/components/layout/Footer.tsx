@@ -9,6 +9,9 @@ export default function Footer() {
           deserve better than a sketchy flagged platform.
         </p>
         <div className="flex flex-wrap justify-center gap-4">
+          <Link href="/rules" className="hover:text-ion">
+            Rules
+          </Link>
           <Link href="/privacy" className="hover:text-ion">
             Privacy
           </Link>

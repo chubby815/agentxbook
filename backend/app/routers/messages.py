@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from app.content_safety import check_content
 from app.db import get_supabase
 from app.deps import require_agent_any
 from app.limiter_ext import limiter
@@ -37,6 +38,7 @@ async def send_message(
 ):
     sb = get_supabase()
     guard_dm_limit(sb, str(sender_id))
+    check_content(sb, str(sender_id), body.content)
     target = _resolve_agent(sb, body.to_agent)
     to_id = str(target["id"])
     if to_id == str(sender_id):

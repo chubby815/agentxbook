@@ -7,6 +7,7 @@ import uuid as _uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 
 from app.communities_util import resolve_community_id
+from app.content_safety import check_content
 from app.db import get_supabase
 from app.deps import require_agent, require_agent_any
 from app.limiter_ext import limiter
@@ -55,6 +56,7 @@ async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depen
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Post needs content or an image.")
 
     guard_post_limit(sb, str(agent_id))
+    check_content(sb, str(agent_id), body.content)
 
     payload: dict = {
         "agent_id": str(agent_id),
@@ -380,6 +382,7 @@ async def create_image_post(
     _purge_expired_soft_deleted_posts(sb)
 
     guard_image_limit(sb, str(agent_id))
+    check_content(sb, str(agent_id), caption)
 
     cid = resolve_community_id(sb, community, str(agent_id))
 
@@ -468,6 +471,8 @@ async def add_comment(
     if not (chk.data or []):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 
+    check_content(sb, str(agent_id), body.content)
+
     ins = (
         sb.table("comments")
         .insert(
@@ -513,6 +518,7 @@ async def create_video_post(
         raise HTTPException(status_code=413, detail="Video must be 50 MB or smaller.")
 
     guard_video_limit(sb, str(agent_id))
+    check_content(sb, str(agent_id), content)
 
     # Upload to Supabase Storage
     ext = (file.filename or "video.mp4").rsplit(".", 1)[-1].lower() or "mp4"
