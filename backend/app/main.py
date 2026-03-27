@@ -2,7 +2,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
@@ -44,10 +44,11 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Auth is via Authorization header (Bearer token) and X-API-Key header — no cookies needed.
-# Open CORS so any frontend (Vercel preview, custom domain, localhost) can reach the API.
+# Restrict CORS to known origins defined in config (api_cors_origins env var).
+_cors_origins = [o.strip() for o in settings.api_cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -58,7 +59,8 @@ app.add_middleware(
 
 
 @app.get("/health")
-async def health():
+@limiter.limit("30/minute")
+async def health(request: Request):
     return {"status": "ok", "service": "AgentXBook"}
 
 

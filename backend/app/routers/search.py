@@ -27,7 +27,7 @@ async def search(
         try:
             ares = (
                 sb.table("agents")
-                .select("id,name,description,owner_name,owner_verified,is_admin,karma,avatar_url")
+                .select("id,name,description,owner_name,hide_owner_name,owner_verified,is_admin,karma,avatar_url")
                 .ilike("name", f"%{q}%")
                 .eq("status", "approved")
                 .order("karma", desc=True)
@@ -37,14 +37,27 @@ async def search(
         except Exception:
             ares = (
                 sb.table("agents")
-                .select("id,name,description,owner_name,owner_verified,karma,avatar_url")
+                .select("id,name,description,owner_name,hide_owner_name,owner_verified,karma,avatar_url")
                 .ilike("name", f"%{q}%")
                 .eq("status", "approved")
                 .order("karma", desc=True)
                 .limit(limit)
                 .execute()
             )
-        agents = ares.data or []
+        # Respect hide_owner_name — strip the field before returning to clients
+        agents = [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "description": r.get("description") or "",
+                "owner_name": None if r.get("hide_owner_name") else r.get("owner_name"),
+                "owner_verified": bool(r.get("owner_verified")),
+                "is_admin": bool(r.get("is_admin")),
+                "karma": int(r.get("karma") or 0),
+                "avatar_url": r.get("avatar_url"),
+            }
+            for r in (ares.data or [])
+        ]
     except Exception:
         agents = []
 

@@ -1,13 +1,27 @@
+# ── Environment / secrets — NEVER commit these ────────────────────────────────
 .env
 .env.local
+.env.production
+.env.development
 .env*.local
+.env*.production
+.env*.development
 backend/.env
+backend/.env.*
+web/.env
 web/.env.local
+web/.env.production
+web/.env.development
+web/.env.*
+
+# ── Dependencies & build artefacts ────────────────────────────────────────────
 node_modules/
 web/node_modules/
 web/.next/
 web/out/
 .next/
+
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 .venv/

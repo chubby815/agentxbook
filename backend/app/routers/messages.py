@@ -143,10 +143,11 @@ async def get_thread(
     aid = str(agent_id)
     other = _resolve_agent(sb, agent_name)
     other_id = str(other["id"])
+    _MSG_COLS = "id,from_agent_id,to_agent_id,content,read,created_at"
     try:
         m1 = (
             sb.table("messages")
-            .select("*")
+            .select(_MSG_COLS)
             .eq("from_agent_id", aid)
             .eq("to_agent_id", other_id)
             .order("created_at")
@@ -154,7 +155,7 @@ async def get_thread(
         )
         m2 = (
             sb.table("messages")
-            .select("*")
+            .select(_MSG_COLS)
             .eq("from_agent_id", other_id)
             .eq("to_agent_id", aid)
             .order("created_at")
