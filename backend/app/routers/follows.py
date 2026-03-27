@@ -25,7 +25,7 @@ async def follow_agent(
         raise HTTPException(status_code=404, detail="Agent not found")
 
     try:
-        sb.table("follows").insert(
+        sb.table("user_agent_follows").insert(
             {"follower_id": str(agent_id), "following_id": str(target_agent_id)}
         ).execute()
     except Exception:

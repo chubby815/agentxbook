@@ -14,7 +14,7 @@ router = APIRouter(prefix="/agents", tags=["agents-public"])
 
 def _follows_table_missing(exc: BaseException) -> bool:
     s = str(exc).lower()
-    if "follows" not in s:
+    if "user_agent_follows" not in s and "follows" not in s:
         return False
     return "does not exist" in s or "42p01" in s or "undefined table" in s
 
@@ -71,14 +71,14 @@ async def agent_by_name(request: Request, name: str):
         # NOTE: avoid limit(0) — supabase-py doesn't reliably populate .count with limit=0.
         # select("id", count="exact") without a limit restriction returns the correct total count.
         fc = (
-            sb.table("follows")
+            sb.table("user_agent_follows")
             .select("id", count="exact")
             .eq("following_id", aid)
             .execute()
         )
         follower_count = int(fc.count or 0)
         fg = (
-            sb.table("follows")
+            sb.table("user_agent_follows")
             .select("id", count="exact")
             .eq("follower_id", aid)
             .execute()
@@ -251,12 +251,12 @@ async def follow_agent_by_name(
     if follower_id == target_id:
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
     try:
-        sb.table("follows").insert({"follower_id": follower_id, "following_id": target_id}).execute()
+        sb.table("user_agent_follows").insert({"follower_id": follower_id, "following_id": target_id}).execute()
     except Exception as e:
         if _follows_table_missing(e):
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Follow feature unavailable: run Supabase migration 005_agent_follows.sql (creates `follows` table).",
+                detail="Follow feature unavailable: run Supabase migration 005_agent_follows.sql (creates `user_agent_follows` table).",
             ) from e
         raise HTTPException(status_code=409, detail="Already following or invalid") from None
     return {"ok": True, "following": True}
@@ -273,12 +273,12 @@ async def unfollow_agent_by_name(
     follower_id = str(agent_id)
     target_id = _resolve_agent_id_by_name(sb, name)
     try:
-        sb.table("follows").delete().eq("follower_id", follower_id).eq("following_id", target_id).execute()
+        sb.table("user_agent_follows").delete().eq("follower_id", follower_id).eq("following_id", target_id).execute()
     except Exception as e:
         if _follows_table_missing(e):
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Follow feature unavailable: run Supabase migration 005_agent_follows.sql (creates `follows` table).",
+                detail="Follow feature unavailable: run Supabase migration 005_agent_follows.sql (creates `user_agent_follows` table).",
             ) from e
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Unfollow failed") from e
     return {"ok": True, "following": False}
@@ -303,7 +303,7 @@ async def check_is_following(
         raise
     try:
         res = (
-            sb.table("follows")
+            sb.table("user_agent_follows")
             .select("id")
             .eq("follower_id", follower_id)
             .eq("following_id", target_id)
@@ -312,7 +312,7 @@ async def check_is_following(
         )
         return {"following": bool(res.data)}
     except Exception:
-        # Missing `follows` table, schema drift, or transient DB errors — don't 500 the whole page.
+        # Missing table, schema drift, or transient DB errors — don't 500 the whole page.
         return {"following": False}
 
 
@@ -322,7 +322,7 @@ async def get_agent_followers(request: Request, name: str):
     sb = get_supabase()
     target_id = _resolve_agent_id_by_name(sb, name)
     res = (
-        sb.table("follows")
+        sb.table("user_agent_follows")
         .select("follower_id,created_at")
         .eq("following_id", target_id)
         .order("created_at", desc=True)
@@ -340,7 +340,7 @@ async def get_agent_following(request: Request, name: str):
     sb = get_supabase()
     target_id = _resolve_agent_id_by_name(sb, name)
     res = (
-        sb.table("follows")
+        sb.table("user_agent_follows")
         .select("following_id,created_at")
         .eq("follower_id", target_id)
         .order("created_at", desc=True)

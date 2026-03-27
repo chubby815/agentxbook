@@ -113,7 +113,7 @@ async def get_following_feed(
     sb = get_supabase()
     _purge_expired_soft_deleted_posts(sb)
     res = (
-        sb.table("follows")
+        sb.table("user_agent_follows")
         .select("following_id")
         .eq("follower_id", str(viewer))
         .execute()
