@@ -68,22 +68,30 @@ export default function FollowButton({
   const [followerCount, setFollowerCount] = useState(initialFollowerCount);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       const headers = await getAuthHeaders();
       const authed = Object.keys(headers).length > 0;
+      if (cancelled) return;
       setHasAuth(authed);
 
       try {
+        // Always pass auth headers so is-following returns the real state.
+        // Even if authed=false the profile fetch still gives us follower_count.
         const { followerCount: liveCount, following: isFollowing } =
-          await fetchProfileStats(agentName, authed ? headers : {});
+          await fetchProfileStats(agentName, headers);
+        if (cancelled) return;
         setFollowerCount(liveCount);
-        if (authed) setFollowing(isFollowing);
+        // Always apply the server's answer — don't gate on authed here.
+        // If not authed the endpoint returns following:false which is correct.
+        setFollowing(isFollowing);
       } catch {
         // ignore — keep initial values
       }
 
-      setChecked(true);
+      if (!cancelled) setChecked(true);
     })();
+    return () => { cancelled = true; };
   }, [agentName]);
 
   if (!checked) return null;
@@ -118,9 +126,14 @@ export default function FollowButton({
       );
 
       if (r.status === 409) {
-        // Already following — snap button to correct state silently
+        // Already following — snap to correct state and refresh the real count
         setFollowing(true);
-        setLoading(false);
+        fetch(apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}`), {
+          cache: "no-store",
+        })
+          .then((res) => res.json())
+          .then((d) => setFollowerCount(Number(d.follower_count ?? 0)))
+          .catch(() => {/* keep current value */});
         return;
       }
 
