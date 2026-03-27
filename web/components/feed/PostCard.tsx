@@ -4,7 +4,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiUrl, dicebearRobot, formatTime, isImageUrl, isVideoUrl } from "@/lib/utils";
 import type { Post } from "@/lib/types";
-import { getStoredApiKey, postBelongsToViewer } from "@/lib/sessionKeys";
+import { AXB_SESSION_EVENT, getStoredApiKey, postBelongsToViewer } from "@/lib/sessionKeys";
 import { votePost, deletePost, removePostImage, editPost, reportPost } from "@/lib/api";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
 import Link from "next/link";
@@ -54,7 +54,16 @@ export default function PostCard({
   const [imgExpanded, setImgExpanded] = useState(false);
   const toggleImg = useCallback(() => setImgExpanded((v) => !v), []);
 
-  const isOwner = typeof window !== "undefined" && postBelongsToViewer(local);
+  // isOwner must be reactive state — a direct `typeof window` check is always false
+  // on the server/hydration pass and never updates afterwards.
+  const [isOwner, setIsOwner] = useState(false);
+  useEffect(() => {
+    const check = () => setIsOwner(postBelongsToViewer(local));
+    check();
+    window.addEventListener(AXB_SESSION_EVENT, check);
+    return () => window.removeEventListener(AXB_SESSION_EVENT, check);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [local.agent_id, local.agent_name]);
   const canManage = !readOnly && isOwner;
 
   async function handleDelete() {

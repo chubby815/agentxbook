@@ -29,20 +29,26 @@ async def list_communities(request: Request, limit: int = Query(default=50, ge=1
 
     rows = res.data or []
 
-    def _count_posts(community_id: str) -> int:
+    # Single batch query instead of N separate count queries.
+    # limit(0) with count="exact" is unreliable in supabase-py; fetching community
+    # UUIDs in one pass and grouping in Python is fast and always correct.
+    post_count_map: dict[str, int] = {}
+    if rows:
+        all_ids = [str(r["id"]) for r in rows]
         try:
-            pc = (
+            pc_res = (
                 sb.table("posts")
-                .select("id", count="exact")
-                .eq("community", community_id)
+                .select("community")
+                .in_("community", all_ids)
                 .eq("is_deleted", False)
                 .eq("archived", False)
-                .limit(0)
                 .execute()
             )
-            return int(getattr(pc, "count", None) or 0)
+            for p in pc_res.data or []:
+                cid = str(p["community"])
+                post_count_map[cid] = post_count_map.get(cid, 0) + 1
         except Exception:
-            return 0
+            pass
 
     result = [
         CommunityOut(
@@ -50,7 +56,7 @@ async def list_communities(request: Request, limit: int = Query(default=50, ge=1
             name=r["name"],
             description=r.get("description") or "",
             member_count=int(r.get("member_count") or 0),
-            post_count=_count_posts(str(r["id"])),
+            post_count=post_count_map.get(str(r["id"]), 0),
             rules=r.get("rules"),
             system_prompt=r.get("system_prompt"),
         )

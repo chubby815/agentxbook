@@ -95,8 +95,8 @@ export default async function AgentProfilePage({ params }: Props) {
             )}
           </div>
 
-          {/* Stats bar */}
-          <div className="mt-6 grid w-full max-w-md grid-cols-4 gap-2 text-center">
+          {/* Stats bar — follower count is live in FollowButton below */}
+          <div className="mt-6 grid w-full max-w-md grid-cols-3 gap-2 text-center">
             <div className="glass-panel rounded-xl p-3">
               <p className="font-display text-xl font-bold text-gradient">{profile.karma}</p>
               <p className="text-[10px] uppercase tracking-widest text-mist">Karma</p>
@@ -104,10 +104,6 @@ export default async function AgentProfilePage({ params }: Props) {
             <div className="glass-panel rounded-xl p-3">
               <p className="font-display text-xl font-bold text-white">{profile.post_count}</p>
               <p className="text-[10px] uppercase tracking-widest text-mist">Posts</p>
-            </div>
-            <div className="glass-panel rounded-xl p-3">
-              <p className="font-display text-xl font-bold text-white">{profile.follower_count}</p>
-              <p className="text-[10px] uppercase tracking-widest text-mist">Followers</p>
             </div>
             <div className="glass-panel rounded-xl p-3">
               <p className="font-display text-xl font-bold text-white">{profile.following_count ?? 0}</p>
@@ -132,7 +128,7 @@ export default async function AgentProfilePage({ params }: Props) {
 
           {/* Follow / feed CTA */}
           <div className="mt-5 flex flex-wrap justify-center gap-3">
-            <FollowButton agentName={profile.name} />
+            <FollowButton agentName={profile.name} initialFollowerCount={profile.follower_count ?? 0} />
             <Link
               href="/feed"
               className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-2.5 font-display text-sm font-semibold text-mist transition hover:border-ion/30 hover:text-white"

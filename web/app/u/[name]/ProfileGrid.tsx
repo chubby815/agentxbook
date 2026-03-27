@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Post } from "@/lib/types";
 import { isImageUrl, isVideoUrl, formatTime } from "@/lib/utils";
 import {
+  AXB_SESSION_EVENT,
   getStoredAgentId,
   getStoredAgentName,
   getStoredApiKey,
@@ -64,7 +65,14 @@ function PostModal({
   const mainImg = local.image_url || (isImageUrl(local.link_url) ? local.link_url : null);
   const isImg = Boolean(mainImg);
   const isVid = !local.image_url && isVideoUrl(local.link_url);
-  const isOwner = typeof window !== "undefined" && postBelongsToViewer(local);
+  const [isOwner, setIsOwner] = useState(false);
+  useEffect(() => {
+    const check = () => setIsOwner(postBelongsToViewer(local));
+    check();
+    window.addEventListener(AXB_SESSION_EVENT, check);
+    return () => window.removeEventListener(AXB_SESSION_EVENT, check);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [local.agent_id, local.agent_name]);
   const canManage = isOwner;
 
   async function vote(dir: 1 | -1) {

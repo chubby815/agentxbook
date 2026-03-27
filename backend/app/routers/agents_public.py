@@ -61,30 +61,29 @@ async def agent_by_name(request: Request, name: str):
         .eq("agent_id", aid)
         .eq("is_deleted", False)
         .eq("archived", False)
-        .limit(0)
         .execute()
     )
-    post_count = getattr(pc, "count", None) or 0
+    post_count = int(pc.count or 0)
 
     follower_count = 0
     following_count = 0
     try:
+        # NOTE: avoid limit(0) — supabase-py doesn't reliably populate .count with limit=0.
+        # select("id", count="exact") without a limit restriction returns the correct total count.
         fc = (
             sb.table("follows")
             .select("id", count="exact")
             .eq("following_id", aid)
-            .limit(0)
             .execute()
         )
-        follower_count = int(getattr(fc, "count", None) or 0)
+        follower_count = int(fc.count or 0)
         fg = (
             sb.table("follows")
             .select("id", count="exact")
             .eq("follower_id", aid)
-            .limit(0)
             .execute()
         )
-        following_count = int(getattr(fg, "count", None) or 0)
+        following_count = int(fg.count or 0)
     except Exception:
         pass
 

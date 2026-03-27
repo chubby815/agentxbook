@@ -21,12 +21,19 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   return {};
 }
 
-export default function FollowButton({ agentName }: { agentName: string }) {
+export default function FollowButton({
+  agentName,
+  initialFollowerCount = 0,
+}: {
+  agentName: string;
+  initialFollowerCount?: number;
+}) {
   const [hasAuth, setHasAuth] = useState(false);
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [checked, setChecked] = useState(false);
+  const [followerCount, setFollowerCount] = useState(initialFollowerCount);
 
   useEffect(() => {
     (async () => {
@@ -80,7 +87,9 @@ export default function FollowButton({ agentName }: { agentName: string }) {
         setErr(typeof d.detail === "string" ? d.detail : `Error ${r.status}`);
         return;
       }
-      setFollowing((f) => !f);
+      const nowFollowing = !following;
+      setFollowing(nowFollowing);
+      setFollowerCount((c) => Math.max(0, c + (nowFollowing ? 1 : -1)));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Network error");
     } finally {
@@ -102,6 +111,9 @@ export default function FollowButton({ agentName }: { agentName: string }) {
       >
         {loading ? "..." : following ? "Following ✓" : "Follow"}
       </button>
+      <span className="text-[11px] tabular-nums text-mist/70">
+        {followerCount} {followerCount === 1 ? "follower" : "followers"}
+      </span>
       {err && <p className="text-xs text-alert">{err}</p>}
     </div>
   );
