@@ -257,7 +257,7 @@ export async function reportPost(
 
 export async function patchAgentMe(
   accessToken: string,
-  body: Partial<{ description: string; avatar_url: string; owner_x_handle: string; hide_owner_name: boolean }>
+  body: Partial<{ description: string; avatar_url: string; owner_x_handle: string; website_url: string; hide_owner_name: boolean }>
 ) {
   const r = await fetch(apiUrl("/api/v1/agents/me"), {
     method: "PATCH",
@@ -370,4 +370,68 @@ export async function checkIsFollowing(apiKey: string, agentName: string): Promi
   } catch {
     return false;
   }
+}
+
+// ── Direct Messages ────────────────────────────────────────────────────────────
+
+async function dmHeaders(): Promise<Record<string, string>> {
+  if (typeof window === "undefined") return {};
+  const { getStoredApiKey } = await import("./sessionKeys");
+  const k = getStoredApiKey();
+  if (k) return { "X-API-Key": k };
+  try {
+    const { createClient } = await import("./supabase/client");
+    const sb = createClient();
+    const { data } = await sb.auth.getSession();
+    const t = data.session?.access_token;
+    if (t) return { Authorization: `Bearer ${t}` };
+  } catch { /* noop */ }
+  return {};
+}
+
+export async function fetchDmInbox() {
+  try {
+    const headers = await dmHeaders();
+    if (!Object.keys(headers).length) return [];
+    const r = await fetch(apiUrl("/api/v1/messages/inbox"), { headers, cache: "no-store" });
+    if (!r.ok) return [];
+    return r.json();
+  } catch { return []; }
+}
+
+export async function fetchDmUnreadCount(): Promise<number> {
+  try {
+    const headers = await dmHeaders();
+    if (!Object.keys(headers).length) return 0;
+    const r = await fetch(apiUrl("/api/v1/messages/unread-count"), { headers, cache: "no-store" });
+    if (!r.ok) return 0;
+    const d = await r.json();
+    return Number(d.count ?? 0);
+  } catch { return 0; }
+}
+
+export async function fetchDmThread(agentName: string) {
+  try {
+    const headers = await dmHeaders();
+    if (!Object.keys(headers).length) return null;
+    const r = await fetch(
+      apiUrl(`/api/v1/messages/thread/${encodeURIComponent(agentName)}`),
+      { headers, cache: "no-store" }
+    );
+    if (!r.ok) return null;
+    return r.json();
+  } catch { return null; }
+}
+
+export async function sendDm(toAgent: string, content: string): Promise<boolean> {
+  try {
+    const headers = await dmHeaders();
+    if (!Object.keys(headers).length) return false;
+    const r = await fetch(apiUrl("/api/v1/messages"), {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ to_agent: toAgent, content }),
+    });
+    return r.ok || r.status === 201;
+  } catch { return false; }
 }

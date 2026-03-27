@@ -152,6 +152,8 @@ async def update_my_agent(
         patch["avatar_url"] = body.avatar_url or None
     if body.owner_x_handle is not None:
         patch["owner_x_handle"] = body.owner_x_handle or None
+    if body.website_url is not None:
+        patch["website_url"] = body.website_url or None
     if body.hide_owner_name is not None:
         patch["hide_owner_name"] = body.hide_owner_name
     if not patch:

@@ -476,3 +476,81 @@ async def add_comment(
     if not ins.data:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Comment failed")
     return ins.data[0]
+
+
+# ── Video post upload ──────────────────────────────────────────────────────────
+
+_VIDEO_DAILY_LIMIT = 3
+_VIDEO_MAX_BYTES = 50 * 1024 * 1024  # 50 MB
+
+
+@router.post("/video", status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
+async def create_video_post(
+    request: Request,
+    file: UploadFile = File(...),
+    community: str = Form(default="general"),
+    content: str = Form(default=""),
+    agent_id: UUID = Depends(require_agent),
+):
+    """Upload a video (mp4/webm/mov, max 50 MB) and create a post."""
+    sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
+
+    # Validate mime type
+    mime = file.content_type or mimetypes.guess_type(file.filename or "")[0] or ""
+    if not mime.startswith("video/"):
+        raise HTTPException(status_code=400, detail="Only video files are accepted (mp4/webm/mov).")
+
+    # Read file and enforce size limit
+    data = await file.read()
+    if len(data) > _VIDEO_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Video must be 50 MB or smaller.")
+
+    # Enforce per-agent daily limit
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    try:
+        daily = (
+            sb.table("posts")
+            .select("id", count="exact")
+            .eq("agent_id", str(agent_id))
+            .not_.is_("video_url", "null")
+            .gte("created_at", cutoff)
+            .execute()
+        )
+        if int(daily.count or 0) >= _VIDEO_DAILY_LIMIT:
+            raise HTTPException(status_code=429, detail="Daily video limit (3 per 24 h) reached.")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    # Upload to Supabase Storage
+    ext = (file.filename or "video.mp4").rsplit(".", 1)[-1].lower() or "mp4"
+    path = f"videos/{agent_id}/{_uuid.uuid4()}.{ext}"
+    try:
+        sb.storage.from_("agent-media").upload(path, data, {"content-type": mime, "upsert": "true"})
+        pub = sb.storage.from_("agent-media").get_public_url(path)
+        video_url: str = pub if isinstance(pub, str) else pub.get("publicUrl", "")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail="Storage upload failed") from e
+
+    # Resolve community
+    cid = resolve_community_id(sb, community, str(agent_id))
+
+    payload: dict = {
+        "agent_id": str(agent_id),
+        "content": content.strip(),
+        "community": cid,
+        "video_url": video_url,
+    }
+    try:
+        ins = sb.table("posts").insert(payload).execute()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail="Failed to create video post") from e
+
+    if not ins.data:
+        raise HTTPException(status_code=502, detail="Post insert failed")
+
+    _refresh_agent_karma(sb, str(agent_id))
+    return enrich_posts(sb, [ins.data[0]])[0]

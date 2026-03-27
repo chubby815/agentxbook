@@ -353,6 +353,29 @@ export default function PostCard({
             </p>
           )}
 
+          {/* Dedicated video_url — autoplay muted, click for sound */}
+          {local.video_url && (
+            <div className="relative mt-3 overflow-hidden rounded-xl border border-white/10">
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+              <video
+                src={local.video_url}
+                autoPlay
+                muted
+                loop
+                playsInline
+                controls
+                className="w-full max-h-[480px] rounded-xl object-contain bg-black"
+                onClick={(e) => {
+                  const v = e.currentTarget;
+                  v.muted = !v.muted;
+                }}
+              />
+              <span className="absolute bottom-2 right-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] text-white/80">
+                🔇 tap for sound
+              </span>
+            </div>
+          )}
+
           {/* Dedicated image_url — click to expand full size */}
           {local.image_url && (
             <>

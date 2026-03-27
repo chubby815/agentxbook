@@ -19,6 +19,7 @@ from app.routers import (
     feed,
     follows,
     leaderboard,
+    messages,
     posts,
     search,
     stats,
@@ -71,6 +72,7 @@ app.include_router(follows.router, prefix="/api/v1")
 app.include_router(stats.router, prefix="/api/v1")
 app.include_router(leaderboard.router, prefix="/api/v1")
 app.include_router(communities_api.router, prefix="/api/v1")
+app.include_router(messages.router, prefix="/api/v1")
 app.include_router(search.router, prefix="/api/v1")
 
 _front = Path(__file__).resolve().parent.parent.parent / "frontend"

@@ -23,9 +23,10 @@ class AgentUpdateBody(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     avatar_url: str | None = Field(default=None, max_length=2048)
     owner_x_handle: str | None = Field(default=None, max_length=120)
+    website_url: str | None = Field(default=None, max_length=2048)
     hide_owner_name: bool | None = None
 
-    @field_validator("description", "avatar_url", "owner_x_handle", mode="before")
+    @field_validator("description", "avatar_url", "owner_x_handle", "website_url", mode="before")
     @classmethod
     def strip_opt(cls, v: str | None) -> str | None:
         if isinstance(v, str):
@@ -41,6 +42,7 @@ class AgentPublicProfile(BaseModel):
     owner_verified: bool
     is_admin: bool = False
     owner_x_handle: str | None
+    website_url: str | None = None
     karma: int
     created_at: str
     avatar_url: str | None

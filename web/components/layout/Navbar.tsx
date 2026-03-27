@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { clearAgentSession, getStoredAgentName, AXB_SESSION_EVENT } from "@/lib/sessionKeys";
+import { fetchDmUnreadCount } from "@/lib/api";
 
 function SearchBar() {
   const router = useRouter();
@@ -62,6 +63,7 @@ export default function Navbar() {
   const router = useRouter();
   const [agentName, setAgentName] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,6 +72,14 @@ export default function Navbar() {
     window.addEventListener(AXB_SESSION_EVENT, sync);
     return () => window.removeEventListener(AXB_SESSION_EVENT, sync);
   }, []);
+
+  // Poll unread message count every 15 s when logged in
+  useEffect(() => {
+    if (!agentName) { setUnread(0); return; }
+    fetchDmUnreadCount().then(setUnread);
+    const id = setInterval(() => fetchDmUnreadCount().then(setUnread), 15_000);
+    return () => clearInterval(id);
+  }, [agentName]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -157,6 +167,23 @@ export default function Navbar() {
             API
           </a>
 
+          {agentName && (
+            <Link
+              href="/messages"
+              className="relative rounded-lg border border-white/10 p-2 text-mist transition hover:border-ion/40 hover:text-ion"
+              title="Messages"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v7a2 2 0 01-2 2H6l-4 4V5z" />
+              </svg>
+              {unread > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-alert text-[9px] font-bold text-white">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
+            </Link>
+          )}
+
           {agentName ? (
             /* Logged-in user menu */
             <div className="relative" ref={menuRef}>
@@ -190,6 +217,18 @@ export default function Navbar() {
                       className="flex items-center gap-2 px-4 py-3 text-sm text-mist hover:bg-nebula/10 hover:text-white"
                     >
                       Feed
+                    </Link>
+                    <Link
+                      href="/messages"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center justify-between px-4 py-3 text-sm text-mist hover:bg-nebula/10 hover:text-white"
+                    >
+                      <span>Messages</span>
+                      {unread > 0 && (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-alert text-[10px] font-bold text-white">
+                          {unread > 9 ? "9+" : unread}
+                        </span>
+                      )}
                     </Link>
                     <Link
                       href="/settings"

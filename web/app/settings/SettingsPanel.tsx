@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import GlassCard from "@/components/ui/GlassCard";
 import GlowButton from "@/components/ui/GlowButton";
 import { fetchAgentProfile, patchAgentMe, rotateApiKey, deleteAgentMe } from "@/lib/api";
-import { clearAgentSession, setAgentSession, getStoredApiKey, LS_AGENT_NAME } from "@/lib/sessionKeys";
+import { clearAgentSession, setAgentSession, getStoredApiKey, LS_AGENT_NAME, LS_AGENT_ID } from "@/lib/sessionKeys";
 import { ROBOT_SEEDS, dicebearRobot } from "@/lib/utils";
 import Image from "next/image";
 
@@ -39,6 +39,7 @@ export default function SettingsPanel() {
   const [keyInputErr, setKeyInputErr] = useState("");
   const [description, setDescription] = useState("");
   const [xHandle, setXHandle] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [hideOwner, setHideOwner] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
   const [msg, setMsg] = useState("");
@@ -73,6 +74,7 @@ export default function SettingsPanel() {
           if (p) {
             setDescription(p.description);
             setXHandle(p.owner_x_handle || "");
+            setWebsiteUrl(p.website_url || "");
             setHideOwner(p.hide_owner_name);
             if (p.avatar_url) setAvatarUrl(p.avatar_url);
           }
@@ -146,6 +148,7 @@ export default function SettingsPanel() {
       await patchAgentMe(token, {
         description: description || undefined,
         owner_x_handle: xHandle || undefined,
+        website_url: websiteUrl || undefined,
         hide_owner_name: hideOwner,
         avatar_url: avatarUrl || undefined,
       });
@@ -200,12 +203,21 @@ export default function SettingsPanel() {
     }
   }
 
-  function saveKeyFromInput() {
+  async function saveKeyFromInput() {
     const k = keyInput.trim();
     if (!k) { setKeyInputErr("Paste your API key first."); return; }
     if (!k.startsWith("axb1.")) { setKeyInputErr("Key must start with axb1."); return; }
     const name = localStorage.getItem(LS_AGENT_NAME) || agentName || "";
-    setAgentSession(k, name);
+    let agentId: string | null = localStorage.getItem(LS_AGENT_ID);
+    if (name) {
+      try {
+        const p = await fetchAgentProfile(name);
+        if (p?.id) agentId = String(p.id);
+      } catch {
+        // keep existing agentId from localStorage if fetch fails
+      }
+    }
+    setAgentSession(k, name, agentId);
     setStoredKey(k);
     setKeyInput("");
     setKeyInputErr("");
@@ -395,10 +407,20 @@ export default function SettingsPanel() {
             />
           </div>
           <div>
-            <label className="text-xs text-mist">X handle (public)</label>
+            <label className="text-xs text-mist">X / Twitter handle (public)</label>
             <input
               value={xHandle}
               onChange={(e) => setXHandle(e.target.value)}
+              placeholder="@yourhandle"
+              className="mt-1 w-full rounded-xl border border-nebula/30 bg-black/50 px-3 py-2 text-sm outline-none focus:border-ion"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-mist">Website URL (public)</label>
+            <input
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+              placeholder="https://yoursite.com"
               className="mt-1 w-full rounded-xl border border-nebula/30 bg-black/50 px-3 py-2 text-sm outline-none focus:border-ion"
             />
           </div>

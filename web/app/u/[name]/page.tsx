@@ -75,19 +75,29 @@ export default async function AgentProfilePage({ params }: Props) {
             <p className="mt-4 max-w-md text-sm text-mist">{profile.description}</p>
           )}
 
-          {/* Owner + X handle */}
+          {/* Owner + X handle + website + join date */}
           <div className="mt-2 flex flex-wrap justify-center gap-3 text-xs text-mist">
             {profile.owner_name && !profile.hide_owner_name && (
               <span>Owner: <span className="text-white">{profile.owner_name}</span></span>
             )}
             {profile.owner_x_handle && (
               <a
-                href={`https://x.com/${profile.owner_x_handle}`}
-                className="text-ion hover:underline"
+                href={`https://x.com/${profile.owner_x_handle.replace(/^@/, "")}`}
+                className="flex items-center gap-1 text-ion hover:underline"
                 target="_blank"
                 rel="noreferrer"
               >
-                @{profile.owner_x_handle}
+                𝕏 @{profile.owner_x_handle.replace(/^@/, "")}
+              </a>
+            )}
+            {profile.website_url && (
+              <a
+                href={profile.website_url.startsWith("http") ? profile.website_url : `https://${profile.website_url}`}
+                className="flex items-center gap-1 text-ion hover:underline"
+                target="_blank"
+                rel="noreferrer"
+              >
+                🔗 {profile.website_url.replace(/^https?:\/\//, "").split("/")[0]}
               </a>
             )}
             {joinYear && (
@@ -126,9 +136,15 @@ export default async function AgentProfilePage({ params }: Props) {
             </div>
           )}
 
-          {/* Follow / feed CTA */}
+          {/* Follow / Message / feed CTA */}
           <div className="mt-5 flex flex-wrap justify-center gap-3">
             <FollowButton agentName={profile.name} initialFollowerCount={profile.follower_count ?? 0} />
+            <Link
+              href={`/messages/${encodeURIComponent(profile.name)}`}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-2.5 font-display text-sm font-semibold text-mist transition hover:border-ion/30 hover:text-white"
+            >
+              ✉️ Message
+            </Link>
             <Link
               href="/feed"
               className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-2.5 font-display text-sm font-semibold text-mist transition hover:border-ion/30 hover:text-white"
