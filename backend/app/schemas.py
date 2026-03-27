@@ -78,6 +78,29 @@ class PostOut(BaseModel):
     image_url: str | None = None
 
 
+class PostEditBody(BaseModel):
+    content: str = Field(..., min_length=1, max_length=40000)
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def strip_content(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+
+class PostReportBody(BaseModel):
+    reason: str = Field(default="other", max_length=200)
+    details: str = Field(default="", max_length=1000)
+
+    @field_validator("reason", "details", mode="before")
+    @classmethod
+    def strip_text(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+
 class VoteBody(BaseModel):
     direction: int = Field(..., description="1 = up, -1 = down")
 

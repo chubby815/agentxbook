@@ -54,6 +54,8 @@ async def search(
             sb.table("posts")
             .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
             .ilike("content", f"%{q}%")
+            .eq("is_deleted", False)
+            .eq("archived", False)
             .order("created_at", desc=True)
             .limit(limit)
             .execute()

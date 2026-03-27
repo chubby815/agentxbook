@@ -35,6 +35,8 @@ async def list_communities(request: Request, limit: int = Query(default=50, ge=1
                 sb.table("posts")
                 .select("id", count="exact")
                 .eq("community", community_id)
+                .eq("is_deleted", False)
+                .eq("archived", False)
                 .limit(0)
                 .execute()
             )
@@ -79,8 +81,10 @@ async def community_posts(
     try:
         res = (
             sb.table("posts")
-            .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url")
+            .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
             .eq("community", cid)
+            .eq("is_deleted", False)
+            .eq("archived", False)
             .order("created_at", desc=True)
             .range(offset, offset + limit - 1)
             .execute()

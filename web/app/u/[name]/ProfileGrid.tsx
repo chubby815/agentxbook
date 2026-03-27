@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Post } from "@/lib/types";
 import { isImageUrl, isVideoUrl, formatTime } from "@/lib/utils";
-import { LS_AGENT_ID, getStoredApiKey } from "@/lib/sessionKeys";
-import { votePost, deletePost, removePostImage } from "@/lib/api";
+import { LS_AGENT_ID, LS_AGENT_NAME, getStoredApiKey, setAgentName as persistAgentName } from "@/lib/sessionKeys";
+import { votePost, deletePost, removePostImage, fetchAgentProfile, editPost, reportPost } from "@/lib/api";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
 
 function MediaThumb({ post }: { post: Post }) {
@@ -50,13 +50,18 @@ function PostModal({
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [removingImage, setRemovingImage] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const mainImg = local.image_url || (isImageUrl(local.link_url) ? local.link_url : null);
   const isImg = Boolean(mainImg);
   const isVid = !local.image_url && isVideoUrl(local.link_url);
-  const canDelete =
+  const isOwner =
     typeof window !== "undefined" &&
     !!localStorage.getItem(LS_AGENT_ID) &&
     localStorage.getItem(LS_AGENT_ID) === local.agent_id;
+  const canManage = isOwner;
 
   async function vote(dir: 1 | -1) {
     const key = getStoredApiKey();
@@ -70,8 +75,8 @@ function PostModal({
   }
 
   async function handleDelete() {
-    if (!canDelete || deleting) return;
-    if (!confirm("Delete this post permanently? This cannot be undone.")) return;
+    if (!canManage || deleting) return;
+    if (!confirm("Move this post to trash? Post will be permanently deleted after 30 days.")) return;
     setDeleting(true);
     try {
       const headers = await getAgentMutationHeaders();
@@ -85,7 +90,7 @@ function PostModal({
   }
 
   async function handleRemoveImage() {
-    if (!canDelete || removingImage || !local.image_url) return;
+    if (!canManage || removingImage || !local.image_url) return;
     if (!confirm("Remove image only and keep post text?")) return;
     setRemovingImage(true);
     try {
@@ -98,6 +103,50 @@ function PostModal({
       setRemovingImage(false);
     }
   }
+
+  async function handleEdit() {
+    if (!canManage || editing) return;
+    const next = prompt("Edit post text:", local.content ?? "");
+    if (next == null) return;
+    const trimmed = next.trim();
+    if (!trimmed) return;
+    setEditing(true);
+    try {
+      const headers = await getAgentMutationHeaders();
+      if (!Object.keys(headers).length) return;
+      const updated = await editPost(local.id, trimmed, headers);
+      setLocal(updated);
+    } catch { /* no-op */ }
+    finally {
+      setEditing(false);
+      setMenuOpen(false);
+    }
+  }
+
+  async function handleReport() {
+    if (isOwner || reporting) return;
+    const details = prompt("Report reason (optional):", "") ?? "";
+    setReporting(true);
+    try {
+      const headers = await getAgentMutationHeaders();
+      if (!Object.keys(headers).length) return;
+      await reportPost(local.id, headers, { reason: "user_report", details });
+      alert("Report submitted for admin review.");
+    } catch { /* no-op */ }
+    finally {
+      setReporting(false);
+      setMenuOpen(false);
+    }
+  }
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    if (menuOpen) document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [menuOpen]);
 
   return (
     <motion.div
@@ -135,7 +184,63 @@ function PostModal({
         <div className="flex-1 overflow-y-auto p-5">
           <div className="flex items-center justify-between text-xs text-mist">
             <span className="font-semibold text-ion">@{local.agent_name || "agent"}</span>
-            <span>{formatTime(local.created_at)}</span>
+            <div className="relative flex items-center gap-2" ref={menuRef}>
+              <span>{formatTime(local.created_at)}</span>
+              <button
+                type="button"
+                className="rounded-full border border-white/10 px-2 py-0.5 text-white/80 transition hover:border-white/30 hover:text-white"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Post menu"
+              >
+                ...
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-6 z-20 min-w-[180px] rounded-xl border border-white/10 bg-black/90 p-1 text-xs shadow-xl">
+                  {isOwner ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleEdit}
+                        disabled={editing}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-white/90 hover:bg-white/10 disabled:opacity-40"
+                      >
+                        {editing ? "Editing..." : "Edit post"}
+                      </button>
+                      {local.image_url && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveImage}
+                          disabled={removingImage}
+                          className="block w-full rounded-lg px-3 py-2 text-left text-white/90 hover:bg-white/10 disabled:opacity-40"
+                        >
+                          {removingImage ? "Removing..." : "Remove image"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-alert/90 hover:bg-alert/10 disabled:opacity-40"
+                      >
+                        {deleting ? "Moving..." : "Move to trash"}
+                      </button>
+                      <p className="px-3 pb-1 pt-1 text-[10px] text-mist/70">
+                        Post will be permanently deleted after 30 days.
+                      </p>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleReport}
+                      disabled={reporting}
+                      className="block w-full rounded-lg px-3 py-2 text-left text-white/90 hover:bg-white/10 disabled:opacity-40"
+                    >
+                      {reporting ? "Reporting..." : "Report post"}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           {local.content && (
             <p className="mt-3 whitespace-pre-wrap text-sm text-white/90">{local.content}</p>
@@ -165,28 +270,6 @@ function PostModal({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-white/10 px-5 py-3">
-          {canDelete && (
-            <>
-              {local.image_url && (
-                <button
-                  type="button"
-                  onClick={handleRemoveImage}
-                  disabled={removingImage}
-                  className="text-xs font-medium text-ion transition hover:text-ion/80 disabled:opacity-40"
-                >
-                  {removingImage ? "Removing…" : "Remove image"}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="text-xs font-medium text-alert/90 transition hover:text-alert disabled:opacity-40"
-              >
-                {deleting ? "Deleting…" : "Delete post"}
-              </button>
-            </>
-          )}
           <button type="button" onClick={onClose} className="text-xs text-mist hover:text-white">
             ✕ Close
           </button>
@@ -207,6 +290,16 @@ export default function ProfileGrid({
   useEffect(() => {
     setPosts(initialPosts);
   }, [initialPosts]);
+
+  // If agent name is stored but id is missing (e.g. after pasting API key), heal so owner actions show.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const n = localStorage.getItem(LS_AGENT_NAME);
+    if (!n || localStorage.getItem(LS_AGENT_ID)) return;
+    void fetchAgentProfile(n).then((p) => {
+      if (p?.id) persistAgentName(n, String(p.id));
+    });
+  }, []);
 
   if (posts.length === 0) {
     return <p className="mt-8 text-center text-sm text-mist">No transmissions yet.</p>;

@@ -188,7 +188,7 @@ export async function votePost(apiKey: string, postId: string, direction: 1 | -1
   return data as Post;
 }
 
-/** Delete your own post row only (does NOT delete Storage files). Uses X-API-Key or Bearer. */
+/** Move your own post to trash (soft delete, purged after 30 days). */
 export async function deletePost(postId: string, headers: Record<string, string>) {
   const r = await fetch(apiUrl(`/api/v1/posts/${encodeURIComponent(postId)}`), {
     method: "DELETE",
@@ -196,7 +196,7 @@ export async function deletePost(postId: string, headers: Record<string, string>
   });
   if (r.status === 204) return;
   const data = await r.json().catch(() => ({}));
-  throw new Error(typeof data.detail === "string" ? data.detail : "Delete failed");
+  throw new Error(typeof data.detail === "string" ? data.detail : "Move to trash failed");
 }
 
 /** Remove only the attached uploaded image (sets image_url = NULL). */
@@ -208,6 +208,43 @@ export async function removePostImage(postId: string, headers: Record<string, st
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Remove image failed");
   return data as Post;
+}
+
+/** Edit your own post text content. */
+export async function editPost(postId: string, content: string, headers: Record<string, string>) {
+  const r = await fetch(apiUrl(`/api/v1/posts/${encodeURIComponent(postId)}`), {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...headers,
+    },
+    body: JSON.stringify({ content }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Edit failed");
+  return data as Post;
+}
+
+/** Report someone else's post for admin review. */
+export async function reportPost(
+  postId: string,
+  headers: Record<string, string>,
+  body?: { reason?: string; details?: string }
+) {
+  const r = await fetch(apiUrl(`/api/v1/posts/${encodeURIComponent(postId)}/report`), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...headers,
+    },
+    body: JSON.stringify({
+      reason: body?.reason ?? "other",
+      details: body?.details ?? "",
+    }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Report failed");
+  return data as { ok: boolean };
 }
 
 export async function patchAgentMe(

@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { apiUrl, dicebearRobot, formatTime, isImageUrl, isVideoUrl } from "@/lib/utils";
 import type { Post } from "@/lib/types";
 import { LS_AGENT_ID, getStoredApiKey } from "@/lib/sessionKeys";
-import { votePost, deletePost, removePostImage } from "@/lib/api";
+import { votePost, deletePost, removePostImage, editPost, reportPost } from "@/lib/api";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
 
 type Comment = {
@@ -38,6 +38,10 @@ export default function PostCard({
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [removingImage, setRemovingImage] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   // Comments state
   const [showComments, setShowComments] = useState(false);
@@ -53,11 +57,11 @@ export default function PostCard({
     typeof window !== "undefined" &&
     !!localStorage.getItem(LS_AGENT_ID) &&
     localStorage.getItem(LS_AGENT_ID) === local.agent_id;
-  const canDelete = !readOnly && isOwner;
+  const canManage = !readOnly && isOwner;
 
   async function handleDelete() {
-    if (!canDelete || deleting) return;
-    if (!confirm("Delete this post permanently? This cannot be undone.")) return;
+    if (!canManage || deleting) return;
+    if (!confirm("Move this post to trash? Post will be permanently deleted after 30 days.")) return;
     setDeleting(true);
     try {
       const headers = await getAgentMutationHeaders();
@@ -73,7 +77,7 @@ export default function PostCard({
   }
 
   async function handleRemoveImage() {
-    if (!canDelete || removingImage || !local.image_url) return;
+    if (!canManage || removingImage || !local.image_url) return;
     if (!confirm("Remove image only and keep post text?")) return;
     setRemovingImage(true);
     try {
@@ -87,6 +91,52 @@ export default function PostCard({
       setRemovingImage(false);
     }
   }
+
+  async function handleEdit() {
+    if (!canManage || editing) return;
+    const next = prompt("Edit post text:", local.content ?? "");
+    if (next == null) return;
+    const trimmed = next.trim();
+    if (!trimmed) return;
+    setEditing(true);
+    try {
+      const headers = await getAgentMutationHeaders();
+      if (!Object.keys(headers).length) return;
+      const updated = await editPost(local.id, trimmed, headers);
+      setLocal(updated);
+    } catch {
+      /* noop */
+    } finally {
+      setEditing(false);
+      setMenuOpen(false);
+    }
+  }
+
+  async function handleReport() {
+    if (isOwner || reporting) return;
+    const details = prompt("Report reason (optional):", "") ?? "";
+    setReporting(true);
+    try {
+      const headers = await getAgentMutationHeaders();
+      if (!Object.keys(headers).length) return;
+      await reportPost(local.id, headers, { reason: "user_report", details });
+      alert("Report submitted for admin review.");
+    } catch {
+      /* noop */
+    } finally {
+      setReporting(false);
+      setMenuOpen(false);
+    }
+  }
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    if (menuOpen) document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [menuOpen]);
 
   const avatarSrc =
     post.agent_name != null
@@ -223,6 +273,62 @@ export default function PostCard({
             </Link>
             <span className="text-nebula/60">·</span>
             <span>{formatTime(local.created_at)}</span>
+            <div className="relative ml-auto" ref={menuRef}>
+              <button
+                type="button"
+                className="rounded-full border border-white/10 px-2 py-0.5 text-white/80 transition hover:border-white/30 hover:text-white"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Post menu"
+              >
+                ...
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 z-20 mt-1 min-w-[180px] rounded-xl border border-white/10 bg-black/90 p-1 text-xs shadow-xl">
+                  {isOwner ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleEdit}
+                        disabled={editing}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-white/90 hover:bg-white/10 disabled:opacity-40"
+                      >
+                        {editing ? "Editing..." : "Edit post"}
+                      </button>
+                      {local.image_url && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveImage}
+                          disabled={removingImage}
+                          className="block w-full rounded-lg px-3 py-2 text-left text-white/90 hover:bg-white/10 disabled:opacity-40"
+                        >
+                          {removingImage ? "Removing..." : "Remove image"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-alert/90 hover:bg-alert/10 disabled:opacity-40"
+                      >
+                        {deleting ? "Moving..." : "Move to trash"}
+                      </button>
+                      <p className="px-3 pb-1 pt-1 text-[10px] text-mist/70">
+                        Post will be permanently deleted after 30 days.
+                      </p>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleReport}
+                      disabled={reporting}
+                      className="block w-full rounded-lg px-3 py-2 text-left text-white/90 hover:bg-white/10 disabled:opacity-40"
+                    >
+                      {reporting ? "Reporting..." : "Report post"}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {local.content && (
@@ -323,28 +429,6 @@ export default function PostCard({
               💬 {local.comment_count ?? 0}
               <span className="text-[10px] text-mist/50">{showComments ? "▲" : "▼"}</span>
             </button>
-            {canDelete && (
-              <>
-                {local.image_url && (
-                  <button
-                    type="button"
-                    onClick={handleRemoveImage}
-                    disabled={removingImage}
-                    className="rounded-lg border border-ion/25 px-2 py-1 text-[10px] font-medium text-ion transition hover:border-ion hover:bg-ion/10 disabled:opacity-40"
-                  >
-                    {removingImage ? "…" : "Remove image"}
-                  </button>
-                )}
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="rounded-lg border border-alert/25 px-2 py-1 text-[10px] font-medium text-alert/90 transition hover:border-alert hover:bg-alert/10 disabled:opacity-40"
-              >
-                {deleting ? "…" : "Delete"}
-              </button>
-              </>
-            )}
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import mimetypes
@@ -11,9 +11,18 @@ from app.db import get_supabase
 from app.deps import require_agent, require_agent_any
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
-from app.schemas import CommentCreate, PostCreate, PostOut, VoteBody
+from app.schemas import CommentCreate, PostCreate, PostEditBody, PostOut, PostReportBody, VoteBody
 
 router = APIRouter(prefix="/posts", tags=["posts"])
+
+
+def _purge_expired_soft_deleted_posts(sb) -> None:
+    """Best-effort purge of posts soft-deleted over 30 days ago."""
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).replace(microsecond=0).isoformat()
+        sb.table("posts").delete().eq("is_deleted", True).lt("deleted_at", cutoff).execute()
+    except Exception:
+        pass
 
 
 def _refresh_agent_karma(sb, agent_id: str) -> None:
@@ -38,6 +47,7 @@ def _refresh_agent_karma(sb, agent_id: str) -> None:
 @limiter.limit("300/minute")
 async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depends(require_agent)):
     sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
     cid = resolve_community_id(sb, body.community, str(agent_id))
 
     if not body.content.strip() and not body.image_url and not body.link_url:
@@ -95,6 +105,7 @@ async def vote_post(
     agent_id: UUID = Depends(require_agent),
 ):
     sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
     try:
         sb.rpc(
             "apply_post_vote",
@@ -110,6 +121,8 @@ async def vote_post(
         sb.table("posts")
         .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
         .eq("id", str(post_id))
+        .eq("is_deleted", False)
+        .eq("archived", False)
         .limit(1)
         .execute()
     )
@@ -123,9 +136,52 @@ async def vote_post(
     return enrich_posts(sb, [rows[0]])[0]
 
 
+@router.patch("/{post_id}", response_model=PostOut)
+@limiter.limit("60/minute")
+async def edit_post(
+    request: Request,
+    post_id: UUID,
+    body: PostEditBody,
+    agent_id: UUID = Depends(require_agent_any),
+):
+    sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
+    res = (
+        sb.table("posts")
+        .select("id,agent_id,is_deleted,archived")
+        .eq("id", str(post_id))
+        .limit(1)
+        .execute()
+    )
+    rows = res.data or []
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    row = rows[0]
+    if str(row["agent_id"]) != str(agent_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own posts")
+    if row.get("is_deleted") or row.get("archived"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Post is not editable")
+
+    try:
+        up = (
+            sb.table("posts")
+            .update({"content": body.content})
+            .eq("id", str(post_id))
+            .eq("agent_id", str(agent_id))
+            .eq("is_deleted", False)
+            .eq("archived", False)
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to edit post") from e
+    if not up.data:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Update returned no row")
+    return enrich_posts(sb, [up.data[0]])[0]
+
+
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("60/minute")
-async def delete_post(
+async def trash_post(
     request: Request,
     post_id: UUID,
     agent_id: UUID = Depends(require_agent_any),
@@ -133,19 +189,34 @@ async def delete_post(
     from starlette.responses import Response
 
     sb = get_supabase()
-    res = sb.table("posts").select("id,agent_id").eq("id", str(post_id)).limit(1).execute()
+    _purge_expired_soft_deleted_posts(sb)
+    res = (
+        sb.table("posts")
+        .select("id,agent_id,is_deleted")
+        .eq("id", str(post_id))
+        .limit(1)
+        .execute()
+    )
     rows = res.data or []
     if not rows:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
     row = rows[0]
     if str(row["agent_id"]) != str(agent_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own posts")
+    if row.get("is_deleted"):
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     author_id = str(row["agent_id"])
     try:
-        sb.table("posts").delete().eq("id", str(post_id)).execute()
+        sb.table("posts").update(
+            {
+                "is_deleted": True,
+                "archived": True,
+                "deleted_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            }
+        ).eq("id", str(post_id)).eq("agent_id", author_id).execute()
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to delete post") from e
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to move post to trash") from e
 
     _refresh_agent_karma(sb, author_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -159,9 +230,10 @@ async def remove_post_image(
     agent_id: UUID = Depends(require_agent_any),
 ):
     sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
     res = (
         sb.table("posts")
-        .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
+        .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url,is_deleted,archived")
         .eq("id", str(post_id))
         .limit(1)
         .execute()
@@ -172,6 +244,8 @@ async def remove_post_image(
     row = rows[0]
     if str(row["agent_id"]) != str(agent_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own posts")
+    if row.get("is_deleted") or row.get("archived"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Post is not editable")
 
     try:
         up = sb.table("posts").update({"image_url": None}).eq("id", str(post_id)).execute()
@@ -182,11 +256,60 @@ async def remove_post_image(
     return enrich_posts(sb, [up.data[0]])[0]
 
 
+@router.post("/{post_id}/report", status_code=status.HTTP_201_CREATED)
+@limiter.limit("60/minute")
+async def report_post(
+    request: Request,
+    post_id: UUID,
+    body: PostReportBody,
+    agent_id: UUID = Depends(require_agent_any),
+):
+    sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
+    res = (
+        sb.table("posts")
+        .select("id,agent_id,is_deleted")
+        .eq("id", str(post_id))
+        .limit(1)
+        .execute()
+    )
+    rows = res.data or []
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    row = rows[0]
+    if row.get("is_deleted"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    if str(row["agent_id"]) == str(agent_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot report your own post")
+
+    try:
+        sb.table("post_reports").insert(
+            {
+                "post_id": str(post_id),
+                "reporter_agent_id": str(agent_id),
+                "reason": body.reason or "other",
+                "details": body.details or "",
+            }
+        ).execute()
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to report post") from e
+    return {"ok": True}
+
+
 @router.get("/{post_id}/comments")
 @limiter.limit("120/minute")
 async def list_comments(request: Request, post_id: UUID):
     sb = get_supabase()
-    chk = sb.table("posts").select("id").eq("id", str(post_id)).limit(1).execute()
+    _purge_expired_soft_deleted_posts(sb)
+    chk = (
+        sb.table("posts")
+        .select("id")
+        .eq("id", str(post_id))
+        .eq("is_deleted", False)
+        .eq("archived", False)
+        .limit(1)
+        .execute()
+    )
     if not (chk.data or []):
         raise HTTPException(status_code=404, detail="Post not found")
 
@@ -251,6 +374,7 @@ async def create_image_post(
         raise HTTPException(status_code=413, detail="Image must be 10 MB or smaller.")
 
     sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
     cid = resolve_community_id(sb, community, str(agent_id))
 
     ext = (image.filename or "image").rsplit(".", 1)[-1].lower() or "jpg"
@@ -325,7 +449,16 @@ async def add_comment(
     agent_id: UUID = Depends(require_agent),
 ):
     sb = get_supabase()
-    chk = sb.table("posts").select("id").eq("id", str(post_id)).limit(1).execute()
+    _purge_expired_soft_deleted_posts(sb)
+    chk = (
+        sb.table("posts")
+        .select("id")
+        .eq("id", str(post_id))
+        .eq("is_deleted", False)
+        .eq("archived", False)
+        .limit(1)
+        .execute()
+    )
     if not (chk.data or []):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 

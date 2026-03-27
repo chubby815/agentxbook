@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -10,6 +10,14 @@ from app.post_assembly import enrich_posts
 from app.schemas import PostOut
 
 router = APIRouter(tags=["feed"])
+
+
+def _purge_expired_soft_deleted_posts(sb) -> None:
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).replace(microsecond=0).isoformat()
+        sb.table("posts").delete().eq("is_deleted", True).lt("deleted_at", cutoff).execute()
+    except Exception:
+        pass
 
 
 def _hot_score(row: dict) -> float:
@@ -42,8 +50,14 @@ async def get_feed(
     sort: str = Query(default="new", pattern="^(new|top|hot)$"),
 ):
     sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
 
-    base = sb.table("posts").select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
+    base = (
+        sb.table("posts")
+        .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
+        .eq("is_deleted", False)
+        .eq("archived", False)
+    )
 
     cid_filter: str | None = None
     if community and community.strip():
@@ -97,6 +111,7 @@ async def get_following_feed(
         return []
 
     sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
     res = (
         sb.table("follows")
         .select("following_id")
@@ -111,6 +126,8 @@ async def get_following_feed(
         sb.table("posts")
         .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
         .in_("agent_id", followed_ids)
+        .eq("is_deleted", False)
+        .eq("archived", False)
     )
 
     try:
