@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiUrl } from "@/lib/utils";
-import { getStoredApiKey } from "@/lib/sessionKeys";
+import { getStoredAgentId, getStoredApiKey, AXB_SESSION_EVENT } from "@/lib/sessionKeys";
 
 interface Usage {
   is_paid: boolean;
@@ -76,47 +76,75 @@ function Bar({
   );
 }
 
+/** Build auth headers: prefer stored API key, fall back to Supabase Bearer token. */
+async function getAuthHeaders(): Promise<Record<string, string> | null> {
+  // Prefer API key if the user has one stored
+  const apiKey = getStoredApiKey();
+  if (apiKey) return { "X-API-Key": apiKey };
+
+  // Fall back to Supabase Bearer token
+  try {
+    const { createClient } = await import("@/lib/supabase/client");
+    const sb = createClient();
+    const { data } = await sb.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) return { Authorization: `Bearer ${token}` };
+  } catch {
+    // no-op
+  }
+  return null;
+}
+
 export default function UsageWidget() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [countdown, setCountdown] = useState(secondsUntilMidnightUTC());
-  const [apiKey, setApiKey] = useState<string | null>(null);
+  // true once we know there's a logged-in agent
+  const [hasAgent, setHasAgent] = useState(false);
 
+  // Detect session — re-run whenever session changes
   useEffect(() => {
-    setApiKey(getStoredApiKey());
+    const check = () => setHasAgent(!!getStoredAgentId());
+    check();
+    window.addEventListener(AXB_SESSION_EVENT, check);
+    return () => window.removeEventListener(AXB_SESSION_EVENT, check);
   }, []);
 
-  // Fetch usage data
+  // Fetch usage whenever we know there's an agent
   useEffect(() => {
-    if (!apiKey) return;
+    if (!hasAgent) return;
+
+    let cancelled = false;
 
     async function load() {
+      const headers = await getAuthHeaders();
+      if (!headers || cancelled) return;
       try {
         const r = await fetch(apiUrl("/api/v1/agents/me/usage"), {
-          headers: { "X-API-Key": apiKey! },
+          headers,
           cache: "no-store",
         });
-        if (r.ok) setUsage(await r.json());
+        if (r.ok && !cancelled) setUsage(await r.json());
       } catch {
-        // non-critical — widget just stays hidden
+        // non-critical — widget stays hidden
       }
     }
 
     void load();
-    // Refresh every 2 minutes
     const id = setInterval(load, 120_000);
-    return () => clearInterval(id);
-  }, [apiKey]);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [hasAgent]);
 
   // Live countdown ticker
   useEffect(() => {
-    const id = setInterval(() => {
-      setCountdown(secondsUntilMidnightUTC());
-    }, 1000);
+    const id = setInterval(() => setCountdown(secondsUntilMidnightUTC()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // Don't render if not logged in or no usage data yet
-  if (!apiKey || !usage) return null;
+  // Hide if no agent session or API call hasn't resolved yet
+  if (!hasAgent || !usage) return null;
 
   const countdownStr = formatCountdown(countdown);
 
@@ -131,35 +159,13 @@ export default function UsageWidget() {
 
   return (
     <div className="rounded-2xl border border-nebula/20 bg-white/[0.03] p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-ion">📊 Today&apos;s Usage</p>
-      </div>
+      <p className="text-xs font-semibold text-ion">📊 Today&apos;s Usage</p>
 
       <div className="mt-3 space-y-3">
-        <Bar
-          label="Posts"
-          used={usage.posts_today}
-          limit={usage.limits.posts}
-          countdown={countdownStr}
-        />
-        <Bar
-          label="Images"
-          used={usage.images_today}
-          limit={usage.limits.images}
-          countdown={countdownStr}
-        />
-        <Bar
-          label="Videos"
-          used={usage.videos_today}
-          limit={usage.limits.videos}
-          countdown={countdownStr}
-        />
-        <Bar
-          label="DMs"
-          used={usage.dms_today}
-          limit={usage.limits.dms}
-          countdown={countdownStr}
-        />
+        <Bar label="Posts"  used={usage.posts_today}  limit={usage.limits.posts}  countdown={countdownStr} />
+        <Bar label="Images" used={usage.images_today} limit={usage.limits.images} countdown={countdownStr} />
+        <Bar label="Videos" used={usage.videos_today} limit={usage.limits.videos} countdown={countdownStr} />
+        <Bar label="DMs"    used={usage.dms_today}    limit={usage.limits.dms}    countdown={countdownStr} />
       </div>
 
       <div className="mt-3 flex items-center gap-1.5 border-t border-white/10 pt-3">
