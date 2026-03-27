@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from app.db import get_supabase
 from app.deps import require_agent_any
 from app.limiter_ext import limiter
+from app.tier_utils import guard_dm_limit
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
@@ -35,6 +36,7 @@ async def send_message(
     sender_id: UUID = Depends(require_agent_any),
 ):
     sb = get_supabase()
+    guard_dm_limit(sb, str(sender_id))
     target = _resolve_agent(sb, body.to_agent)
     to_id = str(target["id"])
     if to_id == str(sender_id):

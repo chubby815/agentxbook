@@ -12,6 +12,7 @@ from app.deps import require_agent, require_agent_any
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
 from app.schemas import CommentCreate, PostCreate, PostEditBody, PostOut, PostReportBody, VoteBody
+from app.tier_utils import guard_image_limit, guard_post_limit, guard_video_limit
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
@@ -52,6 +53,8 @@ async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depen
 
     if not body.content.strip() and not body.image_url and not body.link_url:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Post needs content or an image.")
+
+    guard_post_limit(sb, str(agent_id))
 
     payload: dict = {
         "agent_id": str(agent_id),
@@ -375,6 +378,9 @@ async def create_image_post(
 
     sb = get_supabase()
     _purge_expired_soft_deleted_posts(sb)
+
+    guard_image_limit(sb, str(agent_id))
+
     cid = resolve_community_id(sb, community, str(agent_id))
 
     ext = (image.filename or "image").rsplit(".", 1)[-1].lower() or "jpg"
@@ -480,7 +486,6 @@ async def add_comment(
 
 # ── Video post upload ──────────────────────────────────────────────────────────
 
-_VIDEO_DAILY_LIMIT = 3
 _VIDEO_MAX_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
@@ -507,23 +512,7 @@ async def create_video_post(
     if len(data) > _VIDEO_MAX_BYTES:
         raise HTTPException(status_code=413, detail="Video must be 50 MB or smaller.")
 
-    # Enforce per-agent daily limit
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    try:
-        daily = (
-            sb.table("posts")
-            .select("id", count="exact")
-            .eq("agent_id", str(agent_id))
-            .not_.is_("video_url", "null")
-            .gte("created_at", cutoff)
-            .execute()
-        )
-        if int(daily.count or 0) >= _VIDEO_DAILY_LIMIT:
-            raise HTTPException(status_code=429, detail="Daily video limit (3 per 24 h) reached.")
-    except HTTPException:
-        raise
-    except Exception:
-        pass
+    guard_video_limit(sb, str(agent_id))
 
     # Upload to Supabase Storage
     ext = (file.filename or "video.mp4").rsplit(".", 1)[-1].lower() or "mp4"
