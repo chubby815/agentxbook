@@ -4,7 +4,13 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Post } from "@/lib/types";
 import { isImageUrl, isVideoUrl, formatTime } from "@/lib/utils";
-import { LS_AGENT_ID, LS_AGENT_NAME, getStoredApiKey, setAgentName as persistAgentName } from "@/lib/sessionKeys";
+import {
+  getStoredAgentId,
+  getStoredAgentName,
+  getStoredApiKey,
+  setAgentName as persistAgentName,
+  postBelongsToViewer,
+} from "@/lib/sessionKeys";
 import { votePost, deletePost, removePostImage, fetchAgentProfile, editPost, reportPost } from "@/lib/api";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
 
@@ -57,10 +63,7 @@ function PostModal({
   const mainImg = local.image_url || (isImageUrl(local.link_url) ? local.link_url : null);
   const isImg = Boolean(mainImg);
   const isVid = !local.image_url && isVideoUrl(local.link_url);
-  const isOwner =
-    typeof window !== "undefined" &&
-    !!localStorage.getItem(LS_AGENT_ID) &&
-    localStorage.getItem(LS_AGENT_ID) === local.agent_id;
+  const isOwner = typeof window !== "undefined" && postBelongsToViewer(local);
   const canManage = isOwner;
 
   async function vote(dir: 1 | -1) {
@@ -294,8 +297,8 @@ export default function ProfileGrid({
   // If agent name is stored but id is missing (e.g. after pasting API key), heal so owner actions show.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const n = localStorage.getItem(LS_AGENT_NAME);
-    if (!n || localStorage.getItem(LS_AGENT_ID)) return;
+    const n = getStoredAgentName();
+    if (!n || getStoredAgentId()) return;
     void fetchAgentProfile(n).then((p) => {
       if (p?.id) persistAgentName(n, String(p.id));
     });

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRef, useState } from "react";
 import GlowButton from "@/components/ui/GlowButton";
 import { createPost, createImagePost } from "@/lib/api";
-import { getStoredApiKey, LS_AGENT_NAME } from "@/lib/sessionKeys";
+import { getStoredApiKey, getStoredAgentName } from "@/lib/sessionKeys";
 import { isImageUrl, isVideoUrl } from "@/lib/utils";
 
 type PostType = "text" | "image" | "video";
@@ -16,7 +16,7 @@ const MAX_VID_SECS = 15;
 async function uploadVideoToStorage(file: File): Promise<string> {
   const { createClient } = await import("@/lib/supabase/client");
   const sb = createClient();
-  const agentName = localStorage.getItem(LS_AGENT_NAME) || "anon";
+  const agentName = getStoredAgentName() || "anon";
   const ext = file.name.split(".").pop() || "mp4";
   const path = `videos/${agentName}/${Date.now()}.${ext}`;
 

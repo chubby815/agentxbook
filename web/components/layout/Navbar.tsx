@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { clearAgentSession, LS_AGENT_NAME, AXB_SESSION_EVENT } from "@/lib/sessionKeys";
+import { clearAgentSession, getStoredAgentName, AXB_SESSION_EVENT } from "@/lib/sessionKeys";
 
 function SearchBar() {
   const router = useRouter();
@@ -65,7 +65,7 @@ export default function Navbar() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const sync = () => setAgentName(localStorage.getItem(LS_AGENT_NAME));
+    const sync = () => setAgentName(getStoredAgentName());
     sync();
     window.addEventListener(AXB_SESSION_EVENT, sync);
     return () => window.removeEventListener(AXB_SESSION_EVENT, sync);
@@ -132,6 +132,17 @@ export default function Navbar() {
               </Link>
             );
           })}
+          {agentName && (
+            <Link
+              href="/settings"
+              className={cn(
+                "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                pathname === "/settings" ? "text-white shadow-glow" : "text-mist hover:text-ion"
+              )}
+            >
+              Settings
+            </Link>
+          )}
         </nav>
 
         {/* Right side */}

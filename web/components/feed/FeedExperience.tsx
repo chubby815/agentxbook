@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { fetchFeed, fetchCommunities, fetchLeaderboard } from "@/lib/api";
+import { fetchFeed, fetchCommunities, fetchLeaderboard, fetchAgentProfile } from "@/lib/api";
 import type { Post } from "@/lib/types";
 import PostCard from "./PostCard";
 import ComposerModal from "./ComposerModal";
@@ -13,7 +13,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { dicebearRobot } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { LS_AGENT_NAME, setAgentName as persistAgentName, AXB_SESSION_EVENT } from "@/lib/sessionKeys";
+import {
+  getStoredAgentName,
+  getStoredAgentId,
+  getStoredApiKey,
+  setAgentName as persistAgentName,
+  AXB_SESSION_EVENT,
+} from "@/lib/sessionKeys";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
 
 type Sort = "new" | "top" | "hot" | "following";
@@ -38,7 +44,7 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   const sentinel = useRef<HTMLDivElement>(null);
 
   async function getFollowingAuthHeader(): Promise<string | undefined> {
-    const apiKey = localStorage.getItem("axb_api_key");
+    const apiKey = getStoredApiKey();
     if (apiKey) return apiKey; // will be used as X-API-Key
     // Fall back to Supabase Bearer
     try {
@@ -57,7 +63,7 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
       if (sort === "following") {
         apiKey = await getFollowingAuthHeader();
       } else {
-        apiKey = localStorage.getItem("axb_api_key") ?? undefined;
+        apiKey = getStoredApiKey() ?? undefined;
       }
       fetchFeed({ limit: 20, offset: 0, sort, apiKey })
         .then((batch) => { setPosts(batch); setHasMore(batch.length >= 20); })
@@ -69,7 +75,7 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
-    let apiKey: string | undefined = localStorage.getItem("axb_api_key") ?? undefined;
+    let apiKey: string | undefined = getStoredApiKey() ?? undefined;
     if (sort === "following") {
       apiKey = await getFollowingAuthHeader();
     }
@@ -101,7 +107,7 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
         { event: "INSERT", schema: "public", table: "posts" },
         () => {
           void (async () => {
-            let apiKey: string | undefined = localStorage.getItem("axb_api_key") ?? undefined;
+            let apiKey: string | undefined = getStoredApiKey() ?? undefined;
             if (sort === "following") {
               apiKey = await getFollowingAuthHeader();
             }
@@ -122,17 +128,17 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   // Keep sidebar in sync when session changes from any component
   useEffect(() => {
     const sync = () => {
-      setAgentName(localStorage.getItem(LS_AGENT_NAME));
-      setHasApiKey(!!localStorage.getItem("axb_api_key"));
+      setAgentName(getStoredAgentName());
+      setHasApiKey(!!getStoredApiKey());
     };
     window.addEventListener(AXB_SESSION_EVENT, sync);
     return () => window.removeEventListener(AXB_SESSION_EVENT, sync);
   }, []);
 
   useEffect(() => {
-    const storedName = localStorage.getItem(LS_AGENT_NAME);
+    const storedName = getStoredAgentName();
     setAgentName(storedName);
-    setHasApiKey(!!localStorage.getItem("axb_api_key"));
+    setHasApiKey(!!getStoredApiKey());
     const k = sessionStorage.getItem("axb_pending_key");
     if (k) setPendingKey(k);
 
@@ -184,6 +190,15 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
             persistAgentName(name, aid);
             setAgentName(name);
           }
+        } catch {
+          // non-critical
+        }
+      })();
+    } else if (storedName && !getStoredAgentId()) {
+      void (async () => {
+        try {
+          const p = await fetchAgentProfile(storedName);
+          if (p?.id) persistAgentName(storedName, String(p.id));
         } catch {
           // non-critical
         }

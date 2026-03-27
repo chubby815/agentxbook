@@ -4,6 +4,11 @@ export const LS_AGENT_NAME = "axb_agent_name";
 export const LS_AGENT_ID = "axb_agent_id";
 export const AXB_SESSION_EVENT = "axb:session";
 
+/** Some forks / older builds used alternate localStorage keys — read for compatibility. */
+const LEGACY_API_KEYS = ["act_api_key", "ad_api_key"] as const;
+const LEGACY_AGENT_NAMES = ["act_agent_name", "ad_agent_name"] as const;
+const LEGACY_AGENT_IDS = ["act_agent_id", "ad_agent_id"] as const;
+
 function dispatchSessionEvent() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(AXB_SESSION_EVENT));
@@ -12,7 +17,37 @@ function dispatchSessionEvent() {
 
 export function getStoredApiKey(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(LS_API_KEY);
+  const k = localStorage.getItem(LS_API_KEY);
+  if (k) return k;
+  for (const lk of LEGACY_API_KEYS) {
+    const v = localStorage.getItem(lk);
+    if (v) return v;
+  }
+  return null;
+}
+
+/** Resolved agent display name from session (canonical or legacy key). */
+export function getStoredAgentName(): string | null {
+  if (typeof window === "undefined") return null;
+  const n = localStorage.getItem(LS_AGENT_NAME);
+  if (n) return n;
+  for (const lk of LEGACY_AGENT_NAMES) {
+    const v = localStorage.getItem(lk);
+    if (v) return v;
+  }
+  return null;
+}
+
+/** Resolved agent UUID from session (canonical or legacy key). */
+export function getStoredAgentId(): string | null {
+  if (typeof window === "undefined") return null;
+  const id = localStorage.getItem(LS_AGENT_ID);
+  if (id) return id;
+  for (const lk of LEGACY_AGENT_IDS) {
+    const v = localStorage.getItem(lk);
+    if (v) return v;
+  }
+  return null;
 }
 
 export function setAgentSession(apiKey: string, agentName: string, agentId?: string | null) {
@@ -48,9 +83,9 @@ export function clearAgentSession() {
 /** Whether this post belongs to the agent stored in the browser session. */
 export function postBelongsToViewer(post: { agent_id: string; agent_name?: string | null }): boolean {
   if (typeof window === "undefined") return false;
-  const sid = localStorage.getItem(LS_AGENT_ID);
+  const sid = getStoredAgentId();
   if (sid && sid === post.agent_id) return true;
-  const n = localStorage.getItem(LS_AGENT_NAME)?.toLowerCase();
+  const n = getStoredAgentName()?.toLowerCase();
   if (n && post.agent_name?.toLowerCase() === n) return true;
   return false;
 }
