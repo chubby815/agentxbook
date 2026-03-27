@@ -1,21 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Post } from "@/lib/types";
 import { isImageUrl, isVideoUrl, formatTime } from "@/lib/utils";
-import { getStoredApiKey } from "@/lib/sessionKeys";
-import { votePost } from "@/lib/api";
+import { getStoredApiKey, postBelongsToViewer } from "@/lib/sessionKeys";
+import { votePost, deletePost } from "@/lib/api";
+import { getAgentMutationHeaders } from "@/lib/agentAuth";
 
 function MediaThumb({ post }: { post: Post }) {
-  const isImg = isImageUrl(post.link_url);
-  const isVid = isVideoUrl(post.link_url);
+  const imgSrc = post.image_url || post.link_url;
+  const isImg = Boolean(post.image_url) || isImageUrl(post.link_url);
+  const isVid = !post.image_url && isVideoUrl(post.link_url);
 
-  if (isImg) {
+  if (isImg && imgSrc) {
     return (
       <div className="relative aspect-square w-full overflow-hidden bg-black/40">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={post.link_url!} alt="" className="h-full w-full object-cover" loading="lazy" />
+        <img src={imgSrc} alt="" className="h-full w-full object-cover" loading="lazy" />
       </div>
     );
   }
@@ -35,11 +37,22 @@ function MediaThumb({ post }: { post: Post }) {
   );
 }
 
-function PostModal({ post, onClose }: { post: Post; onClose: () => void }) {
+function PostModal({
+  post,
+  onClose,
+  onDeleted,
+}: {
+  post: Post;
+  onClose: () => void;
+  onDeleted: (id: string) => void;
+}) {
   const [local, setLocal] = useState(post);
   const [busy, setBusy] = useState(false);
-  const isImg = isImageUrl(local.link_url);
-  const isVid = isVideoUrl(local.link_url);
+  const [deleting, setDeleting] = useState(false);
+  const mainImg = local.image_url || (isImageUrl(local.link_url) ? local.link_url : null);
+  const isImg = Boolean(mainImg);
+  const isVid = !local.image_url && isVideoUrl(local.link_url);
+  const canDelete = postBelongsToViewer(local);
 
   async function vote(dir: 1 | -1) {
     const key = getStoredApiKey();
@@ -50,6 +63,21 @@ function PostModal({ post, onClose }: { post: Post; onClose: () => void }) {
       setLocal(updated);
     } catch { /* no-op */ }
     finally { setBusy(false); }
+  }
+
+  async function handleDelete() {
+    if (!canDelete || deleting) return;
+    if (!confirm("Delete this post permanently? This cannot be undone.")) return;
+    setDeleting(true);
+    try {
+      const headers = await getAgentMutationHeaders();
+      if (!Object.keys(headers).length) return;
+      await deletePost(local.id, headers);
+      onDeleted(local.id);
+    } catch { /* no-op */ }
+    finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -68,9 +96,9 @@ function PostModal({ post, onClose }: { post: Post; onClose: () => void }) {
         className="glass-panel flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl"
       >
         {/* Media */}
-        {isImg && (
+        {isImg && mainImg && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={local.link_url!} alt="" className="max-h-[55vh] w-full object-contain bg-black" />
+          <img src={mainImg} alt="" className="max-h-[55vh] w-full object-contain bg-black" />
         )}
         {isVid && (
           <video
@@ -117,7 +145,17 @@ function PostModal({ post, onClose }: { post: Post; onClose: () => void }) {
           </div>
         </div>
 
-        <div className="border-t border-white/10 px-5 py-3">
+        <div className="flex flex-wrap items-center gap-3 border-t border-white/10 px-5 py-3">
+          {canDelete && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-xs font-medium text-alert/90 transition hover:text-alert disabled:opacity-40"
+            >
+              {deleting ? "Deleting…" : "Delete post"}
+            </button>
+          )}
           <button type="button" onClick={onClose} className="text-xs text-mist hover:text-white">
             ✕ Close
           </button>
@@ -127,8 +165,13 @@ function PostModal({ post, onClose }: { post: Post; onClose: () => void }) {
   );
 }
 
-export default function ProfileGrid({ posts }: { posts: Post[] }) {
+export default function ProfileGrid({ posts: initialPosts }: { posts: Post[] }) {
+  const [posts, setPosts] = useState(initialPosts);
   const [selected, setSelected] = useState<Post | null>(null);
+
+  useEffect(() => {
+    setPosts(initialPosts);
+  }, [initialPosts]);
 
   if (posts.length === 0) {
     return <p className="mt-8 text-center text-sm text-mist">No transmissions yet.</p>;
@@ -157,7 +200,16 @@ export default function ProfileGrid({ posts }: { posts: Post[] }) {
       </div>
 
       <AnimatePresence>
-        {selected && <PostModal post={selected} onClose={() => setSelected(null)} />}
+        {selected && (
+          <PostModal
+            post={selected}
+            onClose={() => setSelected(null)}
+            onDeleted={(id) => {
+              setPosts((prev) => prev.filter((x) => x.id !== id));
+              setSelected(null);
+            }}
+          />
+        )}
       </AnimatePresence>
     </>
   );

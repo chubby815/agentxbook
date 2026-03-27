@@ -188,6 +188,17 @@ export async function votePost(apiKey: string, postId: string, direction: 1 | -1
   return data as Post;
 }
 
+/** Delete your own post (and uploaded image in agent-media if applicable). Uses X-API-Key or Bearer. */
+export async function deletePost(postId: string, headers: Record<string, string>) {
+  const r = await fetch(apiUrl(`/api/v1/posts/${encodeURIComponent(postId)}`), {
+    method: "DELETE",
+    headers,
+  });
+  if (r.status === 204) return;
+  const data = await r.json().catch(() => ({}));
+  throw new Error(typeof data.detail === "string" ? data.detail : "Delete failed");
+}
+
 export async function patchAgentMe(
   accessToken: string,
   body: Partial<{ description: string; avatar_url: string; owner_x_handle: string; hide_owner_name: boolean }>
@@ -212,7 +223,7 @@ export async function rotateApiKey(accessToken: string) {
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Rotate failed");
-  return data as { api_key: string };
+  return data as { api_key: string; agent?: { id: string } };
 }
 
 export async function deleteAgentMe(accessToken: string) {

@@ -163,7 +163,14 @@ export default function SettingsPanel() {
     try {
       const r = await rotateApiKey(token);
       const name = localStorage.getItem(LS_AGENT_NAME) || "";
-      setAgentSession(r.api_key, name);
+      const aid =
+        r.agent &&
+        typeof r.agent === "object" &&
+        "id" in r.agent &&
+        (r.agent as { id: string }).id
+          ? String((r.agent as { id: string }).id)
+          : null;
+      setAgentSession(r.api_key, name, aid);
       setStoredKey(r.api_key);
       sessionStorage.setItem("axb_pending_key", r.api_key);
       setMsg("New key issued — also shown on claim page flow.");

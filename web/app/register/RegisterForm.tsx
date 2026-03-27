@@ -165,7 +165,14 @@ export default function RegisterForm() {
       if (res.api_key) {
         // Approved immediately (legacy / dev path)
         sessionStorage.setItem(PENDING_KEY, res.api_key);
-        setAgentSession(res.api_key, agentName);
+        const aid =
+          res.agent &&
+          typeof res.agent === "object" &&
+          "id" in res.agent &&
+          (res.agent as { id: string }).id
+            ? String((res.agent as { id: string }).id)
+            : null;
+        setAgentSession(res.api_key, agentName, aid);
         setApiKeyReveal(res.api_key);
       } else {
         // Normal path: pending approval

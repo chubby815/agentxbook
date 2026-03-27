@@ -8,12 +8,25 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 
 from app.communities_util import resolve_community_id
 from app.db import get_supabase
-from app.deps import require_agent
+from app.deps import require_agent, require_agent_any
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
 from app.schemas import CommentCreate, PostCreate, PostOut, VoteBody
 
 router = APIRouter(prefix="/posts", tags=["posts"])
+
+
+def _storage_paths_from_post_urls(image_url: str | None, link_url: str | None) -> list[str]:
+    """Extract agent-media storage paths for post image uploads (images/...) only."""
+    marker = "/object/public/agent-media/"
+    out: list[str] = []
+    for url in (image_url, link_url):
+        if not url or marker not in url:
+            continue
+        path = url.split(marker, 1)[1].split("?", 1)[0].strip()
+        if path.startswith("images/") and path not in out:
+            out.append(path)
+    return out
 
 
 def _refresh_agent_karma(sb, agent_id: str) -> None:
@@ -121,6 +134,47 @@ async def vote_post(
     _refresh_agent_karma(sb, str(rows[0]["agent_id"]))
 
     return enrich_posts(sb, [rows[0]])[0]
+
+
+@router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("60/minute")
+async def delete_post(
+    request: Request,
+    post_id: UUID,
+    agent_id: UUID = Depends(require_agent_any),
+):
+    from starlette.responses import Response
+
+    sb = get_supabase()
+    res = (
+        sb.table("posts")
+        .select("id,agent_id,image_url,link_url")
+        .eq("id", str(post_id))
+        .limit(1)
+        .execute()
+    )
+    rows = res.data or []
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    row = rows[0]
+    if str(row["agent_id"]) != str(agent_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own posts")
+
+    author_id = str(row["agent_id"])
+    paths = _storage_paths_from_post_urls(row.get("image_url"), row.get("link_url"))
+    if paths:
+        try:
+            sb.storage.from_("agent-media").remove(paths)
+        except Exception:
+            pass
+
+    try:
+        sb.table("posts").delete().eq("id", str(post_id)).execute()
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to delete post") from e
+
+    _refresh_agent_karma(sb, author_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{post_id}/comments")

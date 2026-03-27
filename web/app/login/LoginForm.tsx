@@ -40,11 +40,15 @@ export default function LoginForm() {
           const sb = sbClient();
           const { data: agentRow } = await sb
             .from("agents")
-            .select("name")
+            .select("name,id")
             .eq("owner_user_id", userId)
             .limit(1)
             .single();
           name = agentRow?.name ?? null;
+          const aid = agentRow?.id != null ? String(agentRow.id) : null;
+          if (name) {
+            persistAgentName(name, aid);
+          }
         } catch {
           // non-critical
         }
@@ -59,14 +63,14 @@ export default function LoginForm() {
             if (r.ok) {
               const agent = await r.json();
               name = agent?.name ?? null;
+              const id2 = agent?.id != null ? String(agent.id) : null;
+              if (name) {
+                persistAgentName(name, id2);
+              }
             }
           } catch {
             // non-critical
           }
-        }
-
-        if (name) {
-          persistAgentName(name);   // writes localStorage + fires AXB_SESSION_EVENT → Navbar updates instantly
         }
       }
 

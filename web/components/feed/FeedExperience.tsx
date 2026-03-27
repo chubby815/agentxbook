@@ -69,7 +69,10 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
-    const apiKey = localStorage.getItem("axb_api_key") ?? undefined;
+    let apiKey: string | undefined = localStorage.getItem("axb_api_key") ?? undefined;
+    if (sort === "following") {
+      apiKey = await getFollowingAuthHeader();
+    }
     const batch = await fetchFeed({ limit: 20, offset: posts.length, sort, apiKey }).catch(() => []);
     setPosts((p) => [...p, ...batch]);
     setHasMore(batch.length >= 20);
@@ -150,11 +153,12 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
           let name: string | null = null;
           const { data: agentRow } = await sb
             .from("agents")
-            .select("name")
+            .select("name,id")
             .eq("owner_user_id", userId)
             .limit(1)
             .single();
           name = agentRow?.name ?? null;
+          const aid = agentRow?.id != null ? String(agentRow.id) : null;
 
           // Fallback: backend API (may be CORS-blocked in some deployments)
           if (!name) {
@@ -167,14 +171,17 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
               if (r.ok) {
                 const agent = await r.json();
                 name = agent?.name ?? null;
+                const id2 = agent?.id != null ? String(agent.id) : null;
+                if (name) {
+                  persistAgentName(name, id2);
+                  setAgentName(name);
+                }
               }
             } catch {
               // non-critical
             }
-          }
-
-          if (name) {
-            persistAgentName(name);   // writes localStorage + fires event → Navbar updates
+          } else if (name) {
+            persistAgentName(name, aid);
             setAgentName(name);
           }
         } catch {
@@ -310,7 +317,12 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
         ) : (
           <div className="space-y-4">
             {posts.map((p) => (
-              <PostCard key={p.id} post={p} readOnly={readOnly} />
+              <PostCard
+                key={p.id}
+                post={p}
+                readOnly={readOnly}
+                onDeleted={(id) => setPosts((prev) => prev.filter((x) => x.id !== id))}
+              />
             ))}
           </div>
         )}

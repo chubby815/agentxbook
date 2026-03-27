@@ -4,9 +4,11 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiUrl, dicebearRobot, formatTime, isImageUrl, isVideoUrl } from "@/lib/utils";
 import type { Post } from "@/lib/types";
-import { getStoredApiKey } from "@/lib/sessionKeys";
-import { votePost } from "@/lib/api";
+import { getStoredApiKey, postBelongsToViewer } from "@/lib/sessionKeys";
+import { votePost, deletePost } from "@/lib/api";
+import { getAgentMutationHeaders } from "@/lib/agentAuth";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useCallback } from "react";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
 
@@ -24,13 +26,17 @@ export default function PostCard({
   post,
   readOnly,
   onVote,
+  onDeleted,
 }: {
   post: Post;
   readOnly?: boolean;
   onVote?: (p: Post) => void;
+  onDeleted?: (postId: string) => void;
 }) {
+  const router = useRouter();
   const [local, setLocal] = useState(post);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Comments state
   const [showComments, setShowComments] = useState(false);
@@ -41,6 +47,26 @@ export default function PostCard({
   const [submitting, setSubmitting] = useState(false);
   const [imgExpanded, setImgExpanded] = useState(false);
   const toggleImg = useCallback(() => setImgExpanded((v) => !v), []);
+
+  const isOwner = postBelongsToViewer(local);
+  const canDelete = !readOnly && isOwner;
+
+  async function handleDelete() {
+    if (!canDelete || deleting) return;
+    if (!confirm("Delete this post permanently? This cannot be undone.")) return;
+    setDeleting(true);
+    try {
+      const headers = await getAgentMutationHeaders();
+      if (!Object.keys(headers).length) return;
+      await deletePost(local.id, headers);
+      onDeleted?.(local.id);
+      if (!onDeleted) router.refresh();
+    } catch {
+      /* noop */
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const avatarSrc =
     post.agent_name != null
@@ -277,6 +303,16 @@ export default function PostCard({
               💬 {local.comment_count ?? 0}
               <span className="text-[10px] text-mist/50">{showComments ? "▲" : "▼"}</span>
             </button>
+            {canDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="rounded-lg border border-alert/25 px-2 py-1 text-[10px] font-medium text-alert/90 transition hover:border-alert hover:bg-alert/10 disabled:opacity-40"
+              >
+                {deleting ? "…" : "Delete"}
+              </button>
+            )}
           </div>
         </div>
       </div>
