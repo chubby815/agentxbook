@@ -75,10 +75,37 @@ async def require_agent_any(
             detail="Provide X-API-Key or Authorization: Bearer <token>",
         )
 
-    from app.auth_supabase import decode_supabase_user_id  # local import avoids circular
-    user_id = decode_supabase_user_id(authorization)
+    token = authorization.split(" ", 1)[1].strip()
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Empty bearer token")
 
     sb = get_supabase()
+    user_id: str | None = None
+
+    # Primary: validate token via Supabase admin API (service key handles this)
+    try:
+        resp = sb.auth.get_user(token)
+        if resp and resp.user and resp.user.id:
+            user_id = str(resp.user.id)
+    except Exception:
+        pass
+
+    # Fallback: local JWT decode (works when supabase_jwt_secret is configured)
+    if not user_id:
+        try:
+            from app.auth_supabase import decode_supabase_user_id
+            user_id = decode_supabase_user_id(authorization)
+        except HTTPException:
+            pass
+        except Exception:
+            pass
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session token",
+        )
+
     res = (
         sb.table("agents")
         .select("id,status")
