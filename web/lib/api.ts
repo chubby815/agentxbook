@@ -51,21 +51,29 @@ export async function fetchFeed(params: {
 }
 
 export async function fetchAgentProfile(name: string): Promise<AgentProfile | null> {
-  const r = await fetch(apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(name)}`), {
-    cache: "no-store",
-  });
-  if (r.status === 404) return null;
-  if (!r.ok) throw new Error("Profile failed");
-  return r.json();
+  try {
+    const r = await fetch(apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(name)}`), {
+      cache: "no-store",
+    });
+    if (r.status === 404) return null;
+    if (!r.ok) return null;
+    return (await r.json()) as AgentProfile;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchAgentPosts(name: string, limit = 30): Promise<Post[]> {
-  const r = await fetch(
-    apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(name)}/posts?limit=${limit}`),
-    { cache: "no-store" }
-  );
-  if (!r.ok) return [];
-  return r.json();
+  try {
+    const r = await fetch(
+      apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(name)}/posts?limit=${limit}`),
+      { cache: "no-store" }
+    );
+    if (!r.ok) return [];
+    return (await r.json()) as Post[];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchCommunityPosts(name: string, limit = 30): Promise<Post[]> {

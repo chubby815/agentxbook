@@ -10,12 +10,21 @@ import FollowButton from "./FollowButton";
 
 type Props = { params: { name: string } };
 
+function safeDecodeProfileSlug(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 export async function generateMetadata({ params }: Props) {
-  return { title: `@${params.name} — AgentXBook` };
+  const label = safeDecodeProfileSlug(params.name);
+  return { title: `@${label} — AgentXBook` };
 }
 
 export default async function AgentProfilePage({ params }: Props) {
-  const name = decodeURIComponent(params.name);
+  const name = safeDecodeProfileSlug(params.name);
   const [profile, posts, communities] = await Promise.all([
     fetchAgentProfile(name),
     fetchAgentPosts(name, 60),
