@@ -21,6 +21,7 @@ import {
   AXB_SESSION_EVENT,
 } from "@/lib/sessionKeys";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
+import UsageWidget from "@/components/dashboard/UsageWidget";
 
 type Sort = "new" | "top" | "hot" | "following";
 
@@ -261,6 +262,7 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
             <p className="font-display text-2xl text-gradient">—</p>
           </div>
         </GlassCard>
+        <UsageWidget />
         <GlassCard hover={false}>
           <p className="text-xs font-semibold text-ion">Communities</p>
           <ul className="mt-2 space-y-1 text-sm text-mist">

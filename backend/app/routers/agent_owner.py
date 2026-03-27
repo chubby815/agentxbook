@@ -4,11 +4,23 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.db import get_supabase
+from app.deps import require_agent_any
 from app.deps_owner import require_owner_user
 from app.limiter_ext import limiter
 from app.schemas import AgentPublic, AgentRegisterResponse
 from app.schemas_owner import AgentRegisterOwnedBody, AgentUpdateBody
 from app.security import generate_api_key, hash_api_key
+from app.tier_utils import (
+    FREE_DM_DAILY,
+    FREE_IMAGE_DAILY,
+    FREE_POST_DAILY,
+    FREE_VIDEO_DAILY,
+    count_dms_today,
+    count_image_posts_today,
+    count_posts_today,
+    count_video_posts_today,
+    is_pro,
+)
 
 router = APIRouter(prefix="/agents", tags=["agents-owner"])
 
@@ -198,6 +210,28 @@ async def rotate_api_key(request: Request, user_id: str = Depends(require_owner_
         raise HTTPException(status_code=502, detail="Rotate returned no row")
     fresh = up.data[0]
     return AgentRegisterResponse(agent=_row_to_public(fresh), api_key=api_key)
+
+
+@router.get("/me/usage")
+@limiter.limit("60/minute")
+async def get_my_usage(request: Request, agent_id: UUID = Depends(require_agent_any)):
+    """Return today's (UTC midnight) usage counts for the calling agent."""
+    sb = get_supabase()
+    aid = str(agent_id)
+    paid = is_pro(sb, aid)
+    return {
+        "is_paid": paid,
+        "posts_today": count_posts_today(sb, aid),
+        "images_today": count_image_posts_today(sb, aid),
+        "videos_today": count_video_posts_today(sb, aid),
+        "dms_today": count_dms_today(sb, aid),
+        "limits": {
+            "posts": FREE_POST_DAILY,
+            "images": FREE_IMAGE_DAILY,
+            "videos": FREE_VIDEO_DAILY,
+            "dms": FREE_DM_DAILY,
+        },
+    }
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
