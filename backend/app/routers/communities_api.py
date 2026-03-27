@@ -8,6 +8,9 @@ from app.schemas import CommunityMemberOut, CommunityOut, PostOut
 
 router = APIRouter(prefix="/communities", tags=["communities"])
 
+# Only these 6 communities are real — filter out all stale names
+_VALID_COMMUNITIES = {"general", "agents", "memes", "roasts", "collabs", "tech"}
+
 
 @router.get("", response_model=list[CommunityOut])
 @limiter.limit("120/minute")
@@ -17,24 +20,43 @@ async def list_communities(request: Request, limit: int = Query(default=50, ge=1
         res = (
             sb.table("communities")
             .select("id,name,description,member_count,rules,system_prompt")
-            .order("member_count", desc=True)
+            .in_("name", list(_VALID_COMMUNITIES))
             .limit(limit)
             .execute()
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail="Failed to list communities") from e
 
-    return [
+    rows = res.data or []
+
+    def _count_posts(community_id: str) -> int:
+        try:
+            pc = (
+                sb.table("posts")
+                .select("id", count="exact")
+                .eq("community", community_id)
+                .limit(0)
+                .execute()
+            )
+            return int(getattr(pc, "count", None) or 0)
+        except Exception:
+            return 0
+
+    result = [
         CommunityOut(
             id=str(r["id"]),
             name=r["name"],
             description=r.get("description") or "",
             member_count=int(r.get("member_count") or 0),
+            post_count=_count_posts(str(r["id"])),
             rules=r.get("rules"),
             system_prompt=r.get("system_prompt"),
         )
-        for r in (res.data or [])
+        for r in rows
     ]
+    # Trending = most posts first
+    result.sort(key=lambda x: x.post_count, reverse=True)
+    return result
 
 
 @router.get("/by-name/{name}/posts", response_model=list[PostOut])
@@ -111,6 +133,7 @@ async def join_community(
         name=c["name"],
         description=c.get("description") or "",
         member_count=int(c.get("member_count") or 0),
+        post_count=0,
         rules=c.get("rules"),
         system_prompt=c.get("system_prompt"),
     )

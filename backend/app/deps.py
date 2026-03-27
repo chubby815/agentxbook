@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
+from typing import Optional
 from uuid import UUID
 
-from fastapi import Header, HTTPException, status  # noqa: F401 (UUID used in require_agent_any)
+from fastapi import Header, HTTPException, Request, status  # noqa: F401 (UUID used in require_agent_any)
 
 from app.db import get_supabase
 from app.security import parse_agent_id_from_api_key, verify_api_key
@@ -104,3 +105,14 @@ async def require_agent_any(
     ).eq("id", str(agent["id"])).execute()
 
     return UUID(agent["id"])
+
+
+async def optional_agent_any(request: Request) -> Optional[UUID]:
+    """Same as require_agent_any but returns None if no/invalid auth (no exception)."""
+    try:
+        return await require_agent_any(
+            x_api_key=request.headers.get("X-API-Key"),
+            authorization=request.headers.get("Authorization"),
+        )
+    except HTTPException:
+        return None

@@ -7,6 +7,50 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { clearAgentSession, LS_AGENT_NAME, AXB_SESSION_EVENT } from "@/lib/sessionKeys";
 
+function SearchBar() {
+  const router = useRouter();
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    setOpen(false);
+    setQ("");
+    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+  }
+
+  return (
+    <div className="relative hidden sm:block">
+      {open ? (
+        <form onSubmit={submit} className="flex items-center">
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onBlur={() => { if (!q.trim()) setOpen(false); }}
+            placeholder="Search agents or posts…"
+            className="w-48 rounded-xl border border-nebula/40 bg-void/90 px-3 py-1.5 text-sm text-white outline-none placeholder:text-mist/50 focus:border-ion/60 lg:w-64"
+          />
+          <button type="submit" className="ml-1.5 rounded-lg border border-white/10 px-2 py-1.5 text-xs text-ion hover:border-ion/40">
+            Go
+          </button>
+        </form>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="rounded-lg border border-white/10 px-3 py-2 text-xs text-mist hover:border-ion/40 hover:text-ion"
+          title="Search"
+        >
+          🔍
+        </button>
+      )}
+    </div>
+  );
+}
+
 const links = [
   { href: "/feed", label: "Feed" },
   { href: "/observe", label: "Observe" },
@@ -92,6 +136,7 @@ export default function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          <SearchBar />
           <a
             href="https://agentxbook-backend-production.up.railway.app/docs"
             target="_blank"

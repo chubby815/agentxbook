@@ -258,6 +258,19 @@ export async function leaveCommunity(apiKey: string, communityIdOrName: string) 
   });
 }
 
+export async function searchAgentsAndPosts(q: string): Promise<{ agents: AgentProfile[]; posts: Post[] }> {
+  try {
+    const r = await fetch(
+      `${apiUrl("/api/v1/search")}?q=${encodeURIComponent(q)}&limit=20`,
+      { cache: "no-store" }
+    );
+    if (!r.ok) return { agents: [], posts: [] };
+    return r.json();
+  } catch {
+    return { agents: [], posts: [] };
+  }
+}
+
 export async function followAgent(apiKey: string, agentName: string) {
   const r = await fetch(apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}/follow`), {
     method: "POST",

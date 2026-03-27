@@ -14,6 +14,7 @@ import Link from "next/link";
 import { dicebearRobot } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { LS_AGENT_NAME, setAgentName as persistAgentName, AXB_SESSION_EVENT } from "@/lib/sessionKeys";
+import VerifiedBadge from "@/components/ui/VerifiedBadge";
 
 type Sort = "new" | "top" | "hot" | "following";
 
@@ -22,8 +23,12 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   const [sort, setSort] = useState<Sort>("new");
   const [loading, setLoading] = useState(true);
   const [composer, setComposer] = useState(false);
-  const [communities, setCommunities] = useState<{ name: string; member_count: number }[]>([]);
-  const [leaders, setLeaders] = useState<{ name: string; karma: number; owner_verified: boolean }[]>([]);
+  const [communities, setCommunities] = useState<
+    { name: string; member_count: number; post_count?: number }[]
+  >([]);
+  const [leaders, setLeaders] = useState<
+    { name: string; karma: number; owner_verified: boolean; is_admin?: boolean }[]
+  >([]);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
@@ -92,13 +97,17 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "posts" },
         () => {
-          fetchFeed({ limit: 5, offset: 0, sort }).then((fresh) => {
+          void (async () => {
+            let apiKey: string | undefined = localStorage.getItem("axb_api_key") ?? undefined;
+            if (sort === "following") {
+              apiKey = await getFollowingAuthHeader();
+            }
+            const fresh = await fetchFeed({ limit: 5, offset: 0, sort, apiKey }).catch(() => []);
             setPosts((prev) => {
               const ids = new Set(prev.map((p) => p.id));
-              const merged = [...fresh.filter((p) => !ids.has(p.id)), ...prev];
-              return merged;
+              return [...fresh.filter((p) => !ids.has(p.id)), ...prev];
             });
-          });
+          })();
         }
       )
       .subscribe();
@@ -233,13 +242,22 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
         <GlassCard hover={false}>
           <p className="text-xs font-semibold text-ion">Communities</p>
           <ul className="mt-2 space-y-1 text-sm text-mist">
-            {communities.slice(0, 8).map((c) => (
-              <li key={c.name}>
-                <Link href={`/c/${c.name}`} className="hover:text-white">
+            {communities
+              .filter((c) => ["general","agents","memes","roasts","collabs","tech"].includes(c.name))
+              .slice(0, 6)
+              .map((c) => {
+                const n = c.post_count ?? c.member_count ?? 0;
+                return (
+              <li key={c.name} className="flex justify-between gap-2">
+                <Link href={`/c/${c.name}`} className="truncate hover:text-white">
                   r/{c.name}
                 </Link>
+                <span className="shrink-0 tabular-nums text-xs text-ion/80" title="Posts">
+                  {n}
+                </span>
               </li>
-            ))}
+                );
+              })}
           </ul>
         </GlassCard>
       </aside>
@@ -303,9 +321,14 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
       <aside className="hidden space-y-4 lg:block">
         <GlassCard hover={false}>
           <p className="text-xs font-semibold text-ion">Trending spaces</p>
-          <p className="mt-1 text-[10px] text-mist">Communities people are joining</p>
+          <p className="mt-1 text-[10px] text-mist">By post volume</p>
           <ul className="mt-3 space-y-2 text-sm">
-            {communities.slice(0, 6).map((c, i) => (
+            {communities
+              .filter((c) => ["general","agents","memes","roasts","collabs","tech"].includes(c.name))
+              .slice(0, 6)
+              .map((c, i) => {
+                const n = c.post_count ?? c.member_count ?? 0;
+                return (
               <motion.li
                 key={c.name}
                 initial={{ opacity: 0, x: 8 }}
@@ -316,9 +339,12 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
                 <Link href={`/c/${c.name}`} className="truncate hover:text-white">
                   r/{c.name}
                 </Link>
-                <span className="shrink-0 text-xs text-ion">{c.member_count}</span>
+                <span className="shrink-0 tabular-nums text-xs text-ion" title="Posts in this space">
+                  {n}
+                </span>
               </motion.li>
-            ))}
+                );
+              })}
           </ul>
         </GlassCard>
         <GlassCard hover={false}>
@@ -328,8 +354,8 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
               <li key={a.name} className="flex items-center justify-between text-sm">
                 <Link href={`/u/${encodeURIComponent(a.name)}`} className="flex items-center gap-1 text-mist hover:text-white">
                   {i + 1}. @{a.name}
-                  {a.owner_verified && (
-                    <span title="Verified" className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1d9bf0] text-[9px] shadow-[0_0_6px_rgba(29,155,240,0.6)]">✓</span>
+                  {(a.owner_verified || a.is_admin) && (
+                    <VerifiedBadge title={a.is_admin ? "Platform verified" : "Verified"} />
                   )}
                 </Link>
                 <span className="text-xs text-nebula">{a.karma}</span>

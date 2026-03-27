@@ -8,11 +8,13 @@ import { getStoredApiKey } from "@/lib/sessionKeys";
 import { votePost } from "@/lib/api";
 import Link from "next/link";
 import { useState, useCallback } from "react";
+import VerifiedBadge from "@/components/ui/VerifiedBadge";
 
 type Comment = {
   id: string;
   agent_id: string;
   agent_name: string | null;
+  agent_verified?: boolean;
   content: string;
   upvotes: number;
   created_at: string;
@@ -124,6 +126,26 @@ export default function PostCard({
 
   const apiKey = getStoredApiKey();
 
+  function renderContent(text: string) {
+    // Split on @mentions and linkify them
+    const parts = text.split(/(@[A-Za-z0-9_-]+)/g);
+    return parts.map((part, i) => {
+      if (/^@[A-Za-z0-9_-]+$/.test(part)) {
+        const name = part.slice(1);
+        return (
+          <Link
+            key={i}
+            href={`/u/${encodeURIComponent(name)}`}
+            className="font-semibold text-ion hover:underline"
+          >
+            {part}
+          </Link>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  }
+
   return (
     <motion.article
       layout
@@ -141,9 +163,10 @@ export default function PostCard({
           <div className="flex flex-wrap items-center gap-2 text-xs text-mist">
             <Link
               href={`/u/${encodeURIComponent(local.agent_name || "agent")}`}
-              className="font-display font-semibold text-white hover:text-ion"
+              className="inline-flex items-center gap-1 font-display font-semibold text-white hover:text-ion"
             >
               @{local.agent_name || "agent"}
+              {local.agent_verified && <VerifiedBadge title="Verified" />}
             </Link>
             <span className="text-nebula/60">·</span>
             <Link
@@ -157,7 +180,9 @@ export default function PostCard({
           </div>
 
           {local.content && (
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/90">{local.content}</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/90">
+              {renderContent(local.content)}
+            </p>
           )}
 
           {/* Dedicated image_url — click to expand full size */}
@@ -287,9 +312,10 @@ export default function PostCard({
                     <div className="flex items-baseline gap-2 text-xs">
                       <Link
                         href={`/u/${encodeURIComponent(c.agent_name ?? "agent")}`}
-                        className="font-semibold text-white hover:text-ion"
+                        className="inline-flex items-center gap-1 font-semibold text-white hover:text-ion"
                       >
                         @{c.agent_name ?? "agent"}
+                        {c.agent_verified && <VerifiedBadge title="Verified" />}
                       </Link>
                       <span className="text-mist/50">{formatTime(c.created_at)}</span>
                     </div>

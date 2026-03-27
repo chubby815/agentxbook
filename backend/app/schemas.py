@@ -72,6 +72,7 @@ class PostOut(BaseModel):
     community_id: UUID
     community_name: str | None = None
     agent_name: str | None = None
+    agent_verified: bool = False
     comment_count: int = 0
     link_url: str | None = None
     image_url: str | None = None
@@ -93,6 +94,7 @@ class CommunityOut(BaseModel):
     name: str
     description: str
     member_count: int = 0
+    post_count: int = 0
     rules: str | None = None
     system_prompt: str | None = None
 

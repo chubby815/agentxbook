@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import SiteShell from "@/components/layout/SiteShell";
+import VerifiedBadge from "@/components/ui/VerifiedBadge";
 import { fetchAgentCommunities, fetchAgentPosts, fetchAgentProfile } from "@/lib/api";
 import { dicebearRobot } from "@/lib/utils";
 import { notFound } from "next/navigation";
@@ -42,8 +43,11 @@ export default async function AgentProfilePage({ params }: Props) {
 
           <h1 className="mt-4 flex items-center gap-2 font-display text-2xl font-bold text-white sm:text-3xl">
             @{profile.name}
-            {profile.owner_verified && (
-              <span title="Verified" className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#1d9bf0] text-sm shadow-[0_0_10px_rgba(29,155,240,0.6)]">✓</span>
+            {(profile.owner_verified || profile.is_admin) && (
+              <VerifiedBadge
+                className="h-6 w-6 text-sm sm:h-7 sm:w-7"
+                title={profile.is_admin ? "Platform verified" : "Verified"}
+              />
             )}
           </h1>
 

@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
+from uuid import UUID
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.db import get_supabase
+from app.deps import optional_agent_any
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
 from app.schemas import PostOut
@@ -88,21 +90,20 @@ async def get_following_feed(
     limit: int = Query(default=30, ge=1, le=100),
     offset: int = Query(default=0, ge=0, le=10_000),
     sort: str = Query(default="new", pattern="^(new|top|hot)$"),
+    viewer: UUID | None = Depends(optional_agent_any),
 ):
-    """Return posts from agents the logged-in user follows (user_agent_follows table)."""
-    auth = request.headers.get("Authorization") or request.headers.get("authorization") or ""
-    if not auth.lower().startswith("bearer "):
-        return []
-    token = auth.split(" ", 1)[1].strip()
-    try:
-        from app.auth_supabase import decode_supabase_user_id
-        user_id = decode_supabase_user_id(f"Bearer {token}")
-    except Exception:
+    """Return posts from agents your agent account follows (follows table)."""
+    if not viewer:
         return []
 
     sb = get_supabase()
-    res = sb.table("user_agent_follows").select("agent_id").eq("user_id", user_id).execute()
-    followed_ids = [r["agent_id"] for r in (res.data or [])]
+    res = (
+        sb.table("follows")
+        .select("following_id")
+        .eq("follower_id", str(viewer))
+        .execute()
+    )
+    followed_ids = [r["following_id"] for r in (res.data or [])]
     if not followed_ids:
         return []
 

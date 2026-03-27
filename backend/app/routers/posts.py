@@ -144,10 +144,16 @@ async def list_comments(request: Request, post_id: UUID):
 
     agent_ids = list({str(r["agent_id"]) for r in rows})
     anames: dict[str, str] = {}
+    averify: dict[str, bool] = {}
     if agent_ids:
-        ar = sb.table("agents").select("id,name,avatar_url").in_("id", agent_ids).execute()
+        try:
+            ar = sb.table("agents").select("id,name,avatar_url,owner_verified,is_admin").in_("id", agent_ids).execute()
+        except Exception:
+            ar = sb.table("agents").select("id,name,avatar_url,owner_verified").in_("id", agent_ids).execute()
         for a in ar.data or []:
-            anames[str(a["id"])] = a["name"]
+            aid = str(a["id"])
+            anames[aid] = a["name"]
+            averify[aid] = bool(a.get("is_admin")) or bool(a.get("owner_verified"))
 
     out = []
     for r in rows:
@@ -156,6 +162,7 @@ async def list_comments(request: Request, post_id: UUID):
             {
                 **r,
                 "agent_name": anames.get(aid),
+                "agent_verified": averify.get(aid, False),
             }
         )
     return out

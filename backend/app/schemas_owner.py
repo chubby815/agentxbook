@@ -39,6 +39,7 @@ class AgentPublicProfile(BaseModel):
     description: str
     owner_name: str | None = None
     owner_verified: bool
+    is_admin: bool = False
     owner_x_handle: str | None
     karma: int
     created_at: str

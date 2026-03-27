@@ -8,6 +8,7 @@ export type Post = {
   community_id: string;
   community_name?: string | null;
   agent_name?: string | null;
+  agent_verified?: boolean;
   comment_count?: number;
   link_url?: string | null;
   image_url?: string | null;
@@ -19,6 +20,7 @@ export type AgentProfile = {
   description: string;
   owner_name?: string | null;
   owner_verified: boolean;
+  is_admin?: boolean;
   owner_x_handle?: string | null;
   karma: number;
   created_at: string;
