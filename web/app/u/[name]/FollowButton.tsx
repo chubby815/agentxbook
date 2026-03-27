@@ -21,6 +21,38 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   return {};
 }
 
+/** Fetch live follower count + following state in one profile call. */
+async function fetchProfileStats(
+  agentName: string,
+  headers: Record<string, string>,
+): Promise<{ followerCount: number; following: boolean }> {
+  // Fetch is-following and profile in parallel
+  const [isFollowingRes, profileRes] = await Promise.allSettled([
+    fetch(
+      apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}/is-following`),
+      { headers, cache: "no-store" },
+    ),
+    fetch(
+      apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}`),
+      { cache: "no-store" },
+    ),
+  ]);
+
+  let following = false;
+  if (isFollowingRes.status === "fulfilled" && isFollowingRes.value.ok) {
+    const d = await isFollowingRes.value.json().catch(() => ({}));
+    following = Boolean(d.following);
+  }
+
+  let followerCount = 0;
+  if (profileRes.status === "fulfilled" && profileRes.value.ok) {
+    const d = await profileRes.value.json().catch(() => ({}));
+    followerCount = Number(d.follower_count ?? 0);
+  }
+
+  return { followerCount, following };
+}
+
 export default function FollowButton({
   agentName,
   initialFollowerCount = 0,
@@ -38,21 +70,18 @@ export default function FollowButton({
   useEffect(() => {
     (async () => {
       const headers = await getAuthHeaders();
-      setHasAuth(Object.keys(headers).length > 0);
-      if (Object.keys(headers).length > 0) {
-        try {
-          const r = await fetch(
-            apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}/is-following`),
-            { headers, cache: "no-store" }
-          );
-          if (r.ok) {
-            const d = await r.json();
-            setFollowing(Boolean(d.following));
-          }
-        } catch {
-          // ignore
-        }
+      const authed = Object.keys(headers).length > 0;
+      setHasAuth(authed);
+
+      try {
+        const { followerCount: liveCount, following: isFollowing } =
+          await fetchProfileStats(agentName, authed ? headers : {});
+        setFollowerCount(liveCount);
+        if (authed) setFollowing(isFollowing);
+      } catch {
+        // ignore — keep initial values
       }
+
       setChecked(true);
     })();
   }, [agentName]);
@@ -61,12 +90,17 @@ export default function FollowButton({
 
   if (!hasAuth) {
     return (
-      <a
-        href="/login"
-        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-nebula to-[#4a42d4] px-5 py-2.5 font-display text-sm font-semibold text-white shadow-glow transition hover:opacity-90"
-      >
-        Follow
-      </a>
+      <div className="flex flex-col items-center gap-1">
+        <a
+          href="/login"
+          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-nebula to-[#4a42d4] px-5 py-2.5 font-display text-sm font-semibold text-white shadow-glow transition hover:opacity-90"
+        >
+          Follow
+        </a>
+        <span className="text-[11px] tabular-nums text-mist/70">
+          {followerCount} {followerCount === 1 ? "follower" : "followers"}
+        </span>
+      </div>
     );
   }
 
@@ -80,16 +114,32 @@ export default function FollowButton({
       const method = following ? "DELETE" : "POST";
       const r = await fetch(
         apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}/follow`),
-        { method, headers }
+        { method, headers },
       );
+
+      if (r.status === 409) {
+        // Already following — snap button to correct state silently
+        setFollowing(true);
+        setLoading(false);
+        return;
+      }
+
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
         setErr(typeof d.detail === "string" ? d.detail : `Error ${r.status}`);
         return;
       }
+
       const nowFollowing = !following;
       setFollowing(nowFollowing);
+      // Optimistic count update; re-fetch real count in background
       setFollowerCount((c) => Math.max(0, c + (nowFollowing ? 1 : -1)));
+      fetch(apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(agentName)}`), {
+        cache: "no-store",
+      })
+        .then((res) => res.json())
+        .then((d) => setFollowerCount(Number(d.follower_count ?? 0)))
+        .catch(() => {/* keep optimistic value */});
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Network error");
     } finally {

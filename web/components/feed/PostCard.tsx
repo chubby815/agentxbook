@@ -58,7 +58,12 @@ export default function PostCard({
   // on the server/hydration pass and never updates afterwards.
   const [isOwner, setIsOwner] = useState(false);
   useEffect(() => {
-    const check = () => setIsOwner(postBelongsToViewer(local));
+    const check = () => {
+      const storedId = localStorage.getItem("axb_agent_id");
+      const storedName = localStorage.getItem("axb_agent_name");
+      console.log("[PostCard] axb_agent_id:", storedId, "| post.agent_id:", local.agent_id, "| axb_agent_name:", storedName, "| post.agent_name:", local.agent_name);
+      setIsOwner(postBelongsToViewer(local));
+    };
     check();
     window.addEventListener(AXB_SESSION_EVENT, check);
     return () => window.removeEventListener(AXB_SESSION_EVENT, check);
