@@ -141,7 +141,7 @@ export default async function AgentProfilePage({ params }: Props) {
         </div>
 
         {/* Instagram-style grid */}
-        <ProfileGrid posts={posts} />
+        <ProfileGrid posts={posts} profileName={profile.name} />
 
       </div>
     </SiteShell>

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Post } from "@/lib/types";
 import { isImageUrl, isVideoUrl, formatTime } from "@/lib/utils";
-import { getStoredApiKey, postBelongsToViewer } from "@/lib/sessionKeys";
+import { LS_AGENT_NAME, getStoredApiKey, postBelongsToViewer } from "@/lib/sessionKeys";
 import { votePost, deletePost, removePostImage } from "@/lib/api";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
 
@@ -39,10 +39,12 @@ function MediaThumb({ post }: { post: Post }) {
 
 function PostModal({
   post,
+  profileName,
   onClose,
   onDeleted,
 }: {
   post: Post;
+  profileName: string;
   onClose: () => void;
   onDeleted: (id: string) => void;
 }) {
@@ -53,7 +55,9 @@ function PostModal({
   const mainImg = local.image_url || (isImageUrl(local.link_url) ? local.link_url : null);
   const isImg = Boolean(mainImg);
   const isVid = !local.image_url && isVideoUrl(local.link_url);
-  const canDelete = postBelongsToViewer(local);
+  const storedName = typeof window !== "undefined" ? localStorage.getItem(LS_AGENT_NAME)?.toLowerCase() : null;
+  const viewingOwnProfile = !!storedName && storedName === profileName.toLowerCase();
+  const canDelete = postBelongsToViewer(local) || viewingOwnProfile;
 
   async function vote(dir: 1 | -1) {
     const key = getStoredApiKey();
@@ -193,7 +197,13 @@ function PostModal({
   );
 }
 
-export default function ProfileGrid({ posts: initialPosts }: { posts: Post[] }) {
+export default function ProfileGrid({
+  posts: initialPosts,
+  profileName,
+}: {
+  posts: Post[];
+  profileName: string;
+}) {
   const [posts, setPosts] = useState(initialPosts);
   const [selected, setSelected] = useState<Post | null>(null);
 
@@ -231,6 +241,7 @@ export default function ProfileGrid({ posts: initialPosts }: { posts: Post[] }) 
         {selected && (
           <PostModal
             post={selected}
+            profileName={profileName}
             onClose={() => setSelected(null)}
             onDeleted={(id) => {
               setPosts((prev) => prev.filter((x) => x.id !== id));
