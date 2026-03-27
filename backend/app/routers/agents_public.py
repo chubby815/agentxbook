@@ -73,14 +73,14 @@ async def agent_by_name(request: Request, name: str):
         fc = (
             sb.table("user_agent_follows")
             .select("id", count="exact")
-            .eq("following_id", aid)
+            .eq("agent_id", aid)
             .execute()
         )
         follower_count = int(fc.count or 0)
         fg = (
             sb.table("user_agent_follows")
             .select("id", count="exact")
-            .eq("follower_id", aid)
+            .eq("user_id", aid)
             .execute()
         )
         following_count = int(fg.count or 0)
@@ -251,7 +251,7 @@ async def follow_agent_by_name(
     if follower_id == target_id:
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
     try:
-        sb.table("user_agent_follows").insert({"follower_id": follower_id, "following_id": target_id}).execute()
+        sb.table("user_agent_follows").insert({"user_id": follower_id, "agent_id": target_id}).execute()
     except Exception as e:
         if _follows_table_missing(e):
             raise HTTPException(
@@ -273,7 +273,7 @@ async def unfollow_agent_by_name(
     follower_id = str(agent_id)
     target_id = _resolve_agent_id_by_name(sb, name)
     try:
-        sb.table("user_agent_follows").delete().eq("follower_id", follower_id).eq("following_id", target_id).execute()
+        sb.table("user_agent_follows").delete().eq("user_id", follower_id).eq("agent_id", target_id).execute()
     except Exception as e:
         if _follows_table_missing(e):
             raise HTTPException(
@@ -305,8 +305,8 @@ async def check_is_following(
         res = (
             sb.table("user_agent_follows")
             .select("id")
-            .eq("follower_id", follower_id)
-            .eq("following_id", target_id)
+            .eq("user_id", follower_id)
+            .eq("agent_id", target_id)
             .limit(1)
             .execute()
         )
@@ -323,14 +323,14 @@ async def get_agent_followers(request: Request, name: str):
     target_id = _resolve_agent_id_by_name(sb, name)
     res = (
         sb.table("user_agent_follows")
-        .select("follower_id,created_at")
-        .eq("following_id", target_id)
+        .select("user_id,created_at")
+        .eq("agent_id", target_id)
         .order("created_at", desc=True)
         .limit(100)
         .execute()
     )
     rows = res.data or []
-    order = [str(r["follower_id"]) for r in rows]
+    order = [str(r["user_id"]) for r in rows]
     return _follow_agent_rows(sb, order)
 
 
@@ -341,12 +341,12 @@ async def get_agent_following(request: Request, name: str):
     target_id = _resolve_agent_id_by_name(sb, name)
     res = (
         sb.table("user_agent_follows")
-        .select("following_id,created_at")
-        .eq("follower_id", target_id)
+        .select("agent_id,created_at")
+        .eq("user_id", target_id)
         .order("created_at", desc=True)
         .limit(100)
         .execute()
     )
     rows = res.data or []
-    order = [str(r["following_id"]) for r in rows]
+    order = [str(r["agent_id"]) for r in rows]
     return _follow_agent_rows(sb, order)

@@ -114,11 +114,11 @@ async def get_following_feed(
     _purge_expired_soft_deleted_posts(sb)
     res = (
         sb.table("user_agent_follows")
-        .select("following_id")
-        .eq("follower_id", str(viewer))
+        .select("agent_id")
+        .eq("user_id", str(viewer))
         .execute()
     )
-    followed_ids = [r["following_id"] for r in (res.data or [])]
+    followed_ids = [r["agent_id"] for r in (res.data or [])]
     if not followed_ids:
         return []
 

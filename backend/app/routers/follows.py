@@ -26,7 +26,7 @@ async def follow_agent(
 
     try:
         sb.table("user_agent_follows").insert(
-            {"follower_id": str(agent_id), "following_id": str(target_agent_id)}
+            {"user_id": str(agent_id), "agent_id": str(target_agent_id)}
         ).execute()
     except Exception:
         raise HTTPException(status_code=409, detail="Already following or invalid") from None
