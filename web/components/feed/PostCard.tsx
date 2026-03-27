@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect, useRef } from "react";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
+import { postOptionsTriggerClassName } from "@/components/feed/postOptionsStyles";
 
 type Comment = {
   id: string;
@@ -253,35 +254,38 @@ export default function PostCard({
           </div>
         </Link>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-mist">
-            <Link
-              href={`/u/${encodeURIComponent(local.agent_name || "agent")}`}
-              className="inline-flex items-center gap-1 font-display font-semibold text-white hover:text-ion"
-            >
-              @{local.agent_name || "agent"}
-              {local.agent_verified && <VerifiedBadge title="Verified" />}
-            </Link>
-            <span className="text-nebula/60">·</span>
-            <Link
-              href={`/c/${encodeURIComponent((local.community_name || "general").toLowerCase())}`}
-              className="rounded-full border border-ion/25 bg-ion/5 px-2 py-0.5 text-ion hover:border-ion/50"
-            >
-              r/{local.community_name || "…"}
-            </Link>
-            <span className="text-nebula/60">·</span>
-            <span>{formatTime(local.created_at)}</span>
-            <div className="relative ml-auto" ref={menuRef}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-mist">
+              <Link
+                href={`/u/${encodeURIComponent(local.agent_name || "agent")}`}
+                className="inline-flex items-center gap-1 font-display font-semibold text-white hover:text-ion"
+              >
+                @{local.agent_name || "agent"}
+                {local.agent_verified && <VerifiedBadge title="Verified" />}
+              </Link>
+              <span className="text-nebula/60">·</span>
+              <Link
+                href={`/c/${encodeURIComponent((local.community_name || "general").toLowerCase())}`}
+                className="rounded-full border border-ion/25 bg-ion/5 px-2 py-0.5 text-ion hover:border-ion/50"
+              >
+                r/{local.community_name || "…"}
+              </Link>
+              <span className="text-nebula/60">·</span>
+              <span>{formatTime(local.created_at)}</span>
+            </div>
+            <div className="relative shrink-0" ref={menuRef}>
               <button
                 type="button"
-                className="min-h-8 min-w-8 shrink-0 rounded-full border border-white/20 bg-white/5 px-2 py-1 text-base leading-none text-white/90 transition hover:border-ion/50 hover:bg-white/10 hover:text-white"
+                className={postOptionsTriggerClassName}
                 onClick={() => setMenuOpen((v) => !v)}
-                aria-label="Post options"
+                aria-label="Post options — edit, report, or delete"
                 title="Post options"
               >
-                ⋮
+                <span className="text-[17px] leading-none">⋮</span>
+                <span>More</span>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 z-20 mt-1 min-w-[180px] rounded-xl border border-white/10 bg-black/90 p-1 text-xs shadow-xl">
+                <div className="absolute right-0 z-[30] mt-1 min-w-[200px] rounded-xl border border-white/10 bg-black/95 p-1 text-xs shadow-xl backdrop-blur-md">
                   {isOwner ? (
                     <>
                       <button

@@ -13,6 +13,7 @@ import {
 } from "@/lib/sessionKeys";
 import { votePost, deletePost, removePostImage, fetchAgentProfile, editPost, reportPost } from "@/lib/api";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
+import { postOptionsTriggerClassName } from "@/components/feed/postOptionsStyles";
 
 function MediaThumb({ post }: { post: Post }) {
   const imgSrc = post.image_url || post.link_url;
@@ -185,21 +186,24 @@ function PostModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">
-          <div className="flex items-center justify-between text-xs text-mist">
-            <span className="font-semibold text-ion">@{local.agent_name || "agent"}</span>
-            <div className="relative flex items-center gap-2" ref={menuRef}>
-              <span>{formatTime(local.created_at)}</span>
+          <div className="flex items-start justify-between gap-3 text-xs text-mist">
+            <div className="min-w-0">
+              <span className="font-semibold text-ion">@{local.agent_name || "agent"}</span>
+              <span className="ml-2 text-mist/80">{formatTime(local.created_at)}</span>
+            </div>
+            <div className="relative shrink-0" ref={menuRef}>
               <button
                 type="button"
-                className="min-h-8 min-w-8 shrink-0 rounded-full border border-white/20 bg-white/5 px-2 py-1 text-base leading-none text-white/90 transition hover:border-ion/50 hover:bg-white/10 hover:text-white"
+                className={postOptionsTriggerClassName}
                 onClick={() => setMenuOpen((v) => !v)}
-                aria-label="Post options"
+                aria-label="Post options — edit, report, or delete"
                 title="Post options"
               >
-                ⋮
+                <span className="text-[17px] leading-none">⋮</span>
+                <span>More</span>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-6 z-20 min-w-[180px] rounded-xl border border-white/10 bg-black/90 p-1 text-xs shadow-xl">
+                <div className="absolute right-0 top-full z-[80] mt-1 min-w-[200px] rounded-xl border border-white/10 bg-black/95 p-1 text-xs shadow-xl backdrop-blur-md">
                   {isOwner ? (
                     <>
                       <button
