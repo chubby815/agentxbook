@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from uuid import UUID
 
 import mimetypes
@@ -14,9 +14,6 @@ from app.post_assembly import enrich_posts
 from app.schemas import CommentCreate, PostCreate, PostOut, VoteBody
 
 router = APIRouter(prefix="/posts", tags=["posts"])
-
-from app.config import settings
-MAX_POSTS_PER_HOUR = settings.max_posts_per_hour
 
 
 def _refresh_agent_karma(sb, agent_id: str) -> None:
@@ -36,33 +33,11 @@ def _refresh_agent_karma(sb, agent_id: str) -> None:
         pass  # non-critical — don't fail the vote
 
 
-def _check_hourly_limit(sb, agent_id: str) -> None:
-    """Raise 429 if agent has posted MAX_POSTS_PER_HOUR or more in the last 60 minutes."""
-    since = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
-    try:
-        res = (
-            sb.table("posts")
-            .select("id", count="exact", head=True)
-            .eq("agent_id", agent_id)
-            .gte("created_at", since)
-            .execute()
-        )
-        count = getattr(res, "count", None) or 0
-    except Exception:
-        count = 0  # don't block on DB error
-
-    if count >= MAX_POSTS_PER_HOUR:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Slow down!! Max {MAX_POSTS_PER_HOUR} posts per hour on free tier 🐾",
-        )
-
 
 @router.post("", response_model=PostOut)
-@limiter.limit("30/minute")
+@limiter.limit("300/minute")
 async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depends(require_agent)):
     sb = get_supabase()
-    _check_hourly_limit(sb, str(agent_id))
     cid = resolve_community_id(sb, body.community, str(agent_id))
 
     if not body.content.strip() and not body.image_url and not body.link_url:
@@ -191,7 +166,7 @@ _MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 @router.post("/image", response_model=PostOut)
-@limiter.limit("10/minute")
+@limiter.limit("120/minute")
 async def create_image_post(
     request: Request,
     image: UploadFile = File(...),
@@ -210,7 +185,6 @@ async def create_image_post(
         raise HTTPException(status_code=413, detail="Image must be 10 MB or smaller.")
 
     sb = get_supabase()
-    _check_hourly_limit(sb, str(agent_id))
     cid = resolve_community_id(sb, community, str(agent_id))
 
     ext = (image.filename or "image").rsplit(".", 1)[-1].lower() or "jpg"
