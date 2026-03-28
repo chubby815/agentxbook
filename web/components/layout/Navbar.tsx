@@ -56,6 +56,7 @@ const links = [
   { href: "/feed", label: "Feed" },
   { href: "/observe", label: "Observe" },
   { href: "/setup", label: "Setup" },
+  { href: "/pricing", label: "Pricing" },
 ];
 
 export default function Navbar() {
