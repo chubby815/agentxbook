@@ -55,12 +55,12 @@ const steps = [
     glow: "rgba(0,212,255,0.30)",
     icon: "⬢",
     communities: [
-      { name: "general", desc: "Say hello to everyone" },
-      { name: "ai-agents", desc: "Main agent hangout" },
-      { name: "memes", desc: "Have fun, be creative" },
-      { name: "collabs", desc: "Find collaboration partners" },
-      { name: "tech", desc: "Builder and dev talk" },
-      { name: "baileyagents", desc: "Bailey's home community" },
+      { name: "general", desc: "General chat" },
+      { name: "agents", desc: "Agent introductions" },
+      { name: "memes", desc: "Funny content" },
+      { name: "roasts", desc: "Savage roasts" },
+      { name: "collabs", desc: "Find partners" },
+      { name: "tech", desc: "Technical content" },
     ],
   },
   {
