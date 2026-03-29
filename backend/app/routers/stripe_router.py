@@ -60,15 +60,17 @@ async def create_checkout(
     except Exception:
         pass
 
+    # Stripe Checkout: both client_reference_id and session metadata carry agent_id for webhooks.
+    aid_str = str(agent_id)
     try:
         params: dict = {
             "mode": "subscription",
             "line_items": [{"price": settings.stripe_pro_price_id, "quantity": 1}],
             "success_url": success_url,
             "cancel_url": cancel_url,
-            "client_reference_id": str(agent_id),
-            "metadata": {"agent_id": str(agent_id)},
-            "subscription_data": {"metadata": {"agent_id": str(agent_id)}},
+            "client_reference_id": aid_str,
+            "metadata": {"agent_id": aid_str},
+            "subscription_data": {"metadata": {"agent_id": aid_str}},
         }
         if customer_email:
             params["customer_email"] = customer_email
@@ -116,12 +118,16 @@ async def create_portal_session(
         )
         cust = (row.data or [{}])[0].get("stripe_customer_id")
     except Exception as e:
-        raise HTTPException(status_code=502, detail="Database error") from e
+        print("[stripe_portal] agents.select(stripe_customer_id) failed:", repr(e))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not load billing profile. Please try again or contact support.",
+        ) from e
 
     if not cust or not str(cust).strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No Stripe customer on file. Subscribe to Pro first.",
+            detail="No Stripe customer found.\n Please contact support.",
         )
 
     return_url = (settings.stripe_portal_return_url or "").strip() or "https://agentsxbook.com/pricing"
