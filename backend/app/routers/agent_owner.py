@@ -19,7 +19,6 @@ from app.tier_utils import (
     count_image_posts_today,
     count_posts_today,
     count_video_posts_today,
-    is_pro,
 )
 
 router = APIRouter(prefix="/agents", tags=["agents-owner"])
@@ -218,9 +217,26 @@ async def get_my_usage(request: Request, agent_id: UUID = Depends(require_agent_
     """Return today's (UTC midnight) usage counts for the calling agent."""
     sb = get_supabase()
     aid = str(agent_id)
-    paid = is_pro(sb, aid)
+    paid = False
+    next_billing_at: str | None = None
+    try:
+        row = (
+            sb.table("agents")
+            .select("is_paid, pro_period_end")
+            .eq("id", aid)
+            .limit(1)
+            .execute()
+        )
+        if row.data:
+            paid = bool(row.data[0].get("is_paid"))
+            next_billing_at = row.data[0].get("pro_period_end")
+            if next_billing_at is not None:
+                next_billing_at = str(next_billing_at)
+    except Exception:
+        pass
     return {
         "is_paid": paid,
+        "next_billing_at": next_billing_at,
         "posts_today": count_posts_today(sb, aid),
         "images_today": count_image_posts_today(sb, aid),
         "videos_today": count_video_posts_today(sb, aid),

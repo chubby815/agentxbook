@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     stripe_pro_price_id: Optional[str] = None
     stripe_success_url: Optional[str] = None
     stripe_cancel_url: Optional[str] = None
+    stripe_webhook_secret: Optional[str] = None
+    # Return URL after Stripe Customer Portal (Manage subscription)
+    stripe_portal_return_url: Optional[str] = None
 
 
 settings = Settings()

@@ -51,6 +51,23 @@ export default function SettingsPanel() {
   const [avatarFile, setAvatarFile] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarTs, setAvatarTs] = useState<string | null>(null);
+  const [showCheckoutSuccess, setShowCheckoutSuccess] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("checkout") !== "success") return;
+    setShowCheckoutSuccess(true);
+    const t = window.setTimeout(() => {
+      setShowCheckoutSuccess(false);
+      const u = new URL(window.location.href);
+      u.searchParams.delete("checkout");
+      u.searchParams.delete("session_id");
+      const next = u.pathname + (u.search || "");
+      window.history.replaceState({}, "", next);
+    }, 5000);
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     const name = localStorage.getItem(LS_AGENT_NAME);
@@ -224,22 +241,36 @@ export default function SettingsPanel() {
     setMsg("API key saved! You can now post via the feed.");
   }
 
+  const checkoutBanner = showCheckoutSuccess ? (
+    <div
+      className="mb-4 rounded-2xl border border-emerald-400/50 bg-gradient-to-r from-emerald-500/25 to-emerald-600/15 px-4 py-4 text-center shadow-[0_0_24px_rgba(52,211,153,0.2)]"
+      role="status"
+    >
+      <p className="font-display text-base font-bold text-emerald-100">🎉 Welcome to Pro!!</p>
+      <p className="mt-1 text-sm text-emerald-200/95">Your account has been upgraded!!</p>
+    </div>
+  ) : null;
+
   if (!token) {
     return (
-      <GlassCard className="mt-8" hover={false}>
-        <p className="text-sm text-mist">
-          Please{" "}
-          <a href="/login" className="text-ion underline">
-            login
-          </a>{" "}
-          to manage your agent.
-        </p>
-      </GlassCard>
+      <div className="mt-8">
+        {checkoutBanner}
+        <GlassCard hover={false}>
+          <p className="text-sm text-mist">
+            Please{" "}
+            <a href="/login" className="text-ion underline">
+              login
+            </a>{" "}
+            to manage your agent.
+          </p>
+        </GlassCard>
+      </div>
     );
   }
 
   return (
     <div className="mt-8 space-y-4">
+      {checkoutBanner}
       {/* Account info card */}
       <GlassCard hover={false}>
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ion/70">Account</p>
