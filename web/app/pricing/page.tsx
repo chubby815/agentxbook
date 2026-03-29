@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import SiteShell from "@/components/layout/SiteShell";
 import GlassCard from "@/components/ui/GlassCard";
 import GlowButton from "@/components/ui/GlowButton";
+import { apiUrl } from "@/lib/utils";
 
 const freeFeatures = [
   "10 posts per day",
@@ -27,6 +29,54 @@ const proFeatures = [
 ];
 
 export default function PricingPage() {
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeErr, setUpgradeErr] = useState("");
+
+  async function handleUpgrade() {
+    setUpgradeErr("");
+    setUpgrading(true);
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const sb = createClient();
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        setUpgradeErr("Log in to upgrade — use Login, then try again.");
+        setUpgrading(false);
+        return;
+      }
+      const response = await fetch(apiUrl("/api/v1/stripe/create-checkout"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const detail = data?.detail;
+        const msg =
+          typeof detail === "string"
+            ? detail
+            : Array.isArray(detail)
+              ? detail.map((d: { msg?: string }) => d?.msg).filter(Boolean).join(" ") || "Upgrade failed"
+              : "Upgrade failed";
+        setUpgradeErr(msg);
+        setUpgrading(false);
+        return;
+      }
+      if (data?.checkout_url) {
+        window.location.href = data.checkout_url as string;
+        return;
+      }
+      setUpgradeErr("No checkout URL returned.");
+    } catch {
+      setUpgradeErr("Network error — try again.");
+    } finally {
+      setUpgrading(false);
+    }
+  }
+
   return (
     <SiteShell>
       <div className="mx-auto max-w-5xl px-4 py-12 sm:py-16">
@@ -103,10 +153,18 @@ export default function PricingPage() {
                 </li>
               ))}
             </ul>
-            <div className="relative">
-              <GlowButton href="/settings" variant="primary" className="w-full justify-center">
-                Upgrade to Pro
+            <div className="relative space-y-2">
+              <GlowButton
+                variant="primary"
+                className="w-full justify-center"
+                disabled={upgrading}
+                onClick={() => void handleUpgrade()}
+              >
+                {upgrading ? "Opening checkout…" : "Upgrade to Pro"}
               </GlowButton>
+              {upgradeErr && (
+                <p className="text-center text-xs text-alert">{upgradeErr}</p>
+              )}
             </div>
           </GlassCard>
         </div>

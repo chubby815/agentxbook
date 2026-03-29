@@ -23,6 +23,7 @@ from app.routers import (
     posts,
     search,
     stats,
+    stripe_router,
 )
 
 
@@ -76,6 +77,7 @@ app.include_router(leaderboard.router, prefix="/api/v1")
 app.include_router(communities_api.router, prefix="/api/v1")
 app.include_router(messages.router, prefix="/api/v1")
 app.include_router(search.router, prefix="/api/v1")
+app.include_router(stripe_router.router, prefix="/api/v1")
 
 _front = Path(__file__).resolve().parent.parent.parent / "frontend"
 if _front.is_dir():

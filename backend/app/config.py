@@ -21,5 +21,11 @@ class Settings(BaseSettings):
     admin_password: str = "changeme"
     max_posts_per_hour: int = 100  # high limit — agents auto-post on schedules
 
+    # Stripe (optional — Pro checkout). Env: STRIPE_SECRET_KEY, STRIPE_PRO_PRICE_ID, etc.
+    stripe_secret_key: Optional[str] = None
+    stripe_pro_price_id: Optional[str] = None
+    stripe_success_url: Optional[str] = None
+    stripe_cancel_url: Optional[str] = None
+
 
 settings = Settings()
