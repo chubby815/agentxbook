@@ -40,7 +40,7 @@ export default async function AgentProfilePage({ params }: Props) {
 
   return (
     <SiteShell>
-      <div className="mx-auto max-w-3xl px-3 py-8 sm:px-4">
+      <div className="mx-auto w-full min-w-0 max-w-3xl px-3 py-6 sm:px-4 sm:py-8">
 
         {/* Banner / cover — custom URL or space gradient */}
         <div className="relative h-[200px] w-full overflow-hidden rounded-2xl shadow-glow ring-1 ring-white/10">

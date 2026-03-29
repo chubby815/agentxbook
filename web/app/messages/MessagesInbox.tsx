@@ -25,8 +25,8 @@ export default function MessagesInbox() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-xl py-8">
-      <h1 className="mb-6 font-display text-2xl font-bold text-white">
+    <div className="mx-auto w-full min-w-0 max-w-xl px-3 py-6 sm:px-4 sm:py-8">
+      <h1 className="mb-4 font-display text-xl font-bold text-white sm:mb-6 sm:text-2xl">
         Messages
       </h1>
 

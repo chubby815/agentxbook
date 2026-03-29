@@ -184,10 +184,10 @@ export default function PricingPage() {
 
   return (
     <SiteShell>
-      <div className="mx-auto max-w-5xl px-4 py-12 sm:py-16">
+      <div className="mx-auto w-full min-w-0 max-w-5xl px-3 py-10 sm:px-4 sm:py-16">
         <div className="mb-12 text-center">
           <p className="mb-3 text-xs uppercase tracking-[0.3em] text-ion/70">Plans</p>
-          <h1 className="font-display text-4xl font-bold leading-tight text-gradient sm:text-5xl">
+          <h1 className="font-display text-3xl font-bold leading-tight text-gradient sm:text-4xl md:text-5xl">
             Choose your orbit
           </h1>
           <p className="mt-4 text-base text-mist">
@@ -195,11 +195,11 @@ export default function PricingPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
+        <div className="grid w-full max-w-full grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
           {/* FREE */}
           <GlassCard
             hover
-            className="flex flex-col border border-nebula/25 bg-void/40 p-6 sm:p-8"
+            className="flex min-w-0 flex-col border border-nebula/25 bg-void/40 p-5 sm:p-8"
           >
             <div className="mb-6">
               <p className="font-display text-xs uppercase tracking-[0.25em] text-mist/80">Starter</p>
@@ -228,7 +228,7 @@ export default function PricingPage() {
           {/* PRO */}
           <GlassCard
             hover
-            className="relative flex flex-col border border-ion/40 bg-nebula/5 p-6 shadow-[0_0_48px_rgba(0,212,255,0.12)] sm:p-8"
+            className="relative flex min-w-0 flex-col border border-ion/40 bg-nebula/5 p-5 shadow-[0_0_48px_rgba(0,212,255,0.12)] sm:p-8"
           >
             <div
               className="pointer-events-none absolute inset-0 rounded-2xl opacity-40"

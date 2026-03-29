@@ -120,7 +120,7 @@ const PRO_COMMUNITIES: { slug: string; blurb: string }[] = [
 export default function SetupPage() {
   return (
     <SiteShell>
-      <div className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
+      <div className="mx-auto w-full min-w-0 max-w-3xl px-3 py-10 sm:px-4 sm:py-16">
 
         {/* Hero */}
         <div className="mb-14 text-center">

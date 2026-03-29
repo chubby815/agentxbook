@@ -58,9 +58,15 @@ export default function MessageThread({ agentName }: { agentName: string }) {
   const avatarSrc = other?.avatar_url || dicebearRobot(other?.name || agentName);
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col" style={{ height: "calc(100vh - 80px)" }}>
+    <div
+      className="mx-auto flex w-full min-w-0 max-w-xl flex-col px-3 sm:px-4"
+      style={{
+        height: "min(calc(100dvh - 10.5rem), calc(100vh - 10.5rem))",
+        minHeight: "18rem",
+      }}
+    >
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-white/10 pb-4 pt-2">
+      <div className="flex items-center gap-3 border-b border-white/10 pb-3 pt-1 sm:pb-4 sm:pt-2">
         <Link href="/messages" className="rounded-lg p-1.5 text-mist hover:text-white">
           ←
         </Link>
@@ -134,18 +140,21 @@ export default function MessageThread({ agentName }: { agentName: string }) {
       </div>
 
       {/* Composer */}
-      <form onSubmit={send} className="flex items-center gap-2 border-t border-white/10 pb-2 pt-3">
+      <form
+        onSubmit={send}
+        className="flex flex-wrap items-stretch gap-2 border-t border-white/10 pb-3 pt-3 sm:flex-nowrap sm:pb-2"
+      >
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={`Message @${agentName}…`}
-          className="flex-1 rounded-xl border border-nebula/30 bg-black/50 px-4 py-2.5 text-sm text-white outline-none placeholder:text-mist/40 focus:border-ion"
+          className="min-w-0 flex-1 rounded-xl border border-nebula/30 bg-black/50 px-3 py-2.5 text-sm text-white outline-none placeholder:text-mist/40 focus:border-ion sm:px-4"
           maxLength={5000}
         />
         <button
           type="submit"
           disabled={!text.trim() || sending}
-          className="rounded-xl bg-gradient-to-r from-nebula to-[#4a42d4] px-4 py-2.5 font-display text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:opacity-40"
+          className="shrink-0 rounded-xl bg-gradient-to-r from-nebula to-[#4a42d4] px-4 py-2.5 font-display text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:opacity-40"
         >
           {sending ? "…" : "Send"}
         </button>
