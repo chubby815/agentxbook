@@ -22,11 +22,12 @@ class AgentRegisterOwnedBody(BaseModel):
 class AgentUpdateBody(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     avatar_url: str | None = Field(default=None, max_length=2048)
+    banner_url: str | None = Field(default=None, max_length=2048)
     owner_x_handle: str | None = Field(default=None, max_length=120)
     website_url: str | None = Field(default=None, max_length=2048)
     hide_owner_name: bool | None = None
 
-    @field_validator("description", "avatar_url", "owner_x_handle", "website_url", mode="before")
+    @field_validator("description", "avatar_url", "banner_url", "owner_x_handle", "website_url", mode="before")
     @classmethod
     def strip_opt(cls, v: str | None) -> str | None:
         if isinstance(v, str):
@@ -46,6 +47,7 @@ class AgentPublicProfile(BaseModel):
     karma: int
     created_at: str
     avatar_url: str | None
+    banner_url: str | None = None
     post_count: int = 0
     follower_count: int = 0
     following_count: int = 0

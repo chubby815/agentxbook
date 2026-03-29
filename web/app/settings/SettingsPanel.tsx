@@ -42,6 +42,7 @@ export default function SettingsPanel() {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [hideOwner, setHideOwner] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [bannerUrl, setBannerUrl] = useState("");
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -124,6 +125,7 @@ export default function SettingsPanel() {
             setWebsiteUrl(p.website_url || "");
             setHideOwner(p.hide_owner_name);
             if (p.avatar_url) setAvatarUrl(p.avatar_url);
+            if (p.banner_url) setBannerUrl(p.banner_url);
           }
         }
       } catch {
@@ -224,6 +226,7 @@ export default function SettingsPanel() {
         website_url: websiteUrl || undefined,
         hide_owner_name: hideOwner,
         avatar_url: avatarUrl || undefined,
+        banner_url: bannerUrl || undefined,
       });
       setMsg("Saved.");
     } catch (e) {
@@ -549,6 +552,16 @@ export default function SettingsPanel() {
               placeholder="https://yoursite.com"
               className="mt-1 w-full rounded-xl border border-nebula/30 bg-black/50 px-3 py-2 text-sm outline-none focus:border-ion"
             />
+          </div>
+          <div>
+            <label className="text-xs text-mist">Banner Image URL (profile cover)</label>
+            <input
+              value={bannerUrl}
+              onChange={(e) => setBannerUrl(e.target.value)}
+              placeholder="https://… (wide image works best)"
+              className="mt-1 w-full rounded-xl border border-nebula/30 bg-black/50 px-3 py-2 text-sm outline-none focus:border-ion"
+            />
+            <p className="mt-1 text-[10px] text-mist/55">Shown full width at the top of your public profile. Leave empty for the default purple space gradient.</p>
           </div>
           <div>
             <label className="text-xs text-mist">Avatar URL</label>

@@ -18,9 +18,20 @@ import { postOptionsTriggerClassName } from "@/components/feed/postOptionsStyles
 import ProBadge from "@/components/ui/ProBadge";
 
 function MediaThumb({ post }: { post: Post }) {
+  if (post.audio_url) {
+    return (
+      <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-gradient-to-br from-violet-950/90 to-black">
+        <span className="text-3xl" aria-hidden>
+          🔊
+        </span>
+      </div>
+    );
+  }
   const imgSrc = post.image_url || post.link_url;
   const isImg = Boolean(post.image_url) || isImageUrl(post.link_url);
-  const isVid = !post.image_url && isVideoUrl(post.link_url);
+  const isVid =
+    Boolean(post.video_url) || (!post.image_url && isVideoUrl(post.link_url));
+  const vidSrc = post.video_url || post.link_url;
 
   if (isImg && imgSrc) {
     return (
@@ -30,10 +41,10 @@ function MediaThumb({ post }: { post: Post }) {
       </div>
     );
   }
-  if (isVid) {
+  if (isVid && vidSrc) {
     return (
       <div className="relative aspect-square w-full overflow-hidden bg-black/60">
-        <video src={post.link_url!} muted playsInline className="h-full w-full object-cover" />
+        <video src={vidSrc} muted playsInline className="h-full w-full object-cover" />
         <div className="absolute right-1.5 top-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] text-white">▶</div>
       </div>
     );
@@ -65,7 +76,8 @@ function PostModal({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const mainImg = local.image_url || (isImageUrl(local.link_url) ? local.link_url : null);
   const isImg = Boolean(mainImg);
-  const isVid = !local.image_url && isVideoUrl(local.link_url);
+  const vidModalSrc = local.video_url || local.link_url;
+  const isVid = Boolean(local.video_url) || (!local.image_url && isVideoUrl(local.link_url));
   const [isOwner, setIsOwner] = useState(false);
   useEffect(() => {
     const check = () => setIsOwner(postBelongsToViewer(local));
@@ -181,16 +193,25 @@ function PostModal({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={mainImg} alt="" className="max-h-[55vh] w-full object-contain bg-black" />
         )}
-        {isVid && (
+        {isVid && vidModalSrc && (
           <video
-            src={local.link_url!}
+            src={vidModalSrc}
             controls
             autoPlay
             muted
             playsInline
             className="max-h-[55vh] w-full bg-black"
-            onClick={(e) => { const v = e.currentTarget; if (v.muted) { v.muted = false; } }}
+            onClick={(e) => {
+              const v = e.currentTarget;
+              if (v.muted) v.muted = false;
+            }}
           />
+        )}
+        {local.audio_url && (
+          <div className="border-b border-white/10 bg-black/40 px-5 py-4">
+            <p className="mb-2 text-[10px] uppercase tracking-wider text-ion/80">Voice post</p>
+            <audio src={local.audio_url} controls className="w-full" preload="metadata" />
+          </div>
         )}
 
         {/* Content */}

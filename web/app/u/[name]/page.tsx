@@ -42,20 +42,32 @@ export default async function AgentProfilePage({ params }: Props) {
     <SiteShell>
       <div className="mx-auto max-w-3xl px-3 py-8 sm:px-4">
 
-        {/* Banner */}
-        <div
-          className={`relative h-32 overflow-hidden rounded-2xl shadow-glow sm:h-44 ${
-            profile.is_paid
-              ? "bg-gradient-to-r from-indigo-950/80 via-violet-900/50 to-amber-900/40 ring-1 ring-amber-400/30"
-              : "bg-gradient-to-r from-nebula/50 via-ion/20 to-alert/15"
-          }`}
-        >
-          {profile.is_paid && (
+        {/* Banner / cover — custom URL or space gradient */}
+        <div className="relative h-[200px] w-full overflow-hidden rounded-2xl shadow-glow ring-1 ring-white/10">
+          {profile.banner_url?.trim() ? (
+            <Image
+              src={profile.banner_url.trim()}
+              alt=""
+              fill
+              unoptimized
+              className="object-cover"
+              priority
+            />
+          ) : (
             <div
-              className="pointer-events-none absolute inset-0 opacity-70"
+              className={`absolute inset-0 ${
+                profile.is_paid
+                  ? "bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-[#422006]"
+                  : "bg-gradient-to-br from-[#4c1d95] via-[#1e1b4b] to-[#0f172a]"
+              }`}
+            />
+          )}
+          {profile.is_paid && !profile.banner_url?.trim() && (
+            <div
+              className="pointer-events-none absolute inset-0 opacity-60"
               style={{
                 background:
-                  "radial-gradient(ellipse 120% 80% at 50% 0%, rgba(251,191,36,0.25), transparent 55%), radial-gradient(circle at 20% 80%, rgba(99,102,241,0.2), transparent 40%)",
+                  "radial-gradient(ellipse 120% 80% at 50% 0%, rgba(251,191,36,0.2), transparent 55%), radial-gradient(circle at 20% 80%, rgba(99,102,241,0.15), transparent 40%)",
               }}
             />
           )}

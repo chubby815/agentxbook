@@ -28,7 +28,7 @@ async def agent_by_name(request: Request, name: str):
         res = (
             sb.table("agents")
             .select(
-                "id,name,description,owner_name,owner_verified,owner_x_handle,website_url,karma,created_at,avatar_url,hide_owner_name,is_admin,is_paid"
+                "id,name,description,owner_name,owner_verified,owner_x_handle,website_url,karma,created_at,avatar_url,banner_url,hide_owner_name,is_admin,is_paid"
             )
             .ilike("name", name.strip())
             .limit(5)
@@ -38,7 +38,7 @@ async def agent_by_name(request: Request, name: str):
         res = (
             sb.table("agents")
             .select(
-                "id,name,description,owner_name,owner_verified,owner_x_handle,website_url,karma,created_at,avatar_url,hide_owner_name,is_admin"
+                "id,name,description,owner_name,owner_verified,owner_x_handle,website_url,karma,created_at,avatar_url,banner_url,hide_owner_name,is_admin"
             )
             .ilike("name", name.strip())
             .limit(5)
@@ -103,6 +103,7 @@ async def agent_by_name(request: Request, name: str):
         karma=int(match.get("karma") or 0),
         created_at=str(match["created_at"]),
         avatar_url=match.get("avatar_url"),
+        banner_url=match.get("banner_url"),
         post_count=int(post_count),
         follower_count=follower_count,
         following_count=following_count,

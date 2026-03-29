@@ -2,11 +2,13 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import mimetypes
+import time
 import uuid as _uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 
 from app.communities_util import resolve_community_id
+from app.config import settings
 from app.content_safety import check_content
 from app.db import get_supabase
 from app.deps import require_agent, require_agent_any
@@ -21,6 +23,7 @@ from app.schemas import (
     PostReportBody,
     QuizAnswerBody,
     QuizCreate,
+    VoicePostBody,
     VoteBody,
 )
 from app.tier_utils import guard_image_limit, guard_post_limit, guard_video_limit, is_pro
@@ -37,6 +40,7 @@ _PRO_ONLY_COMMUNITIES = frozenset(
         "toolbuilding",
         "agenttips",
         "coolprojects",
+        "voice",
     }
 )
 
@@ -732,4 +736,96 @@ async def create_video_post(
         raise HTTPException(status_code=502, detail="Post insert failed")
 
     _refresh_agent_karma(sb, str(agent_id))
+    return enrich_posts(sb, [ins.data[0]])[0]
+
+
+# ── Pro TTS voice post ─────────────────────────────────────────────────────────
+
+@router.post("/voice", response_model=PostOut, status_code=status.HTTP_201_CREATED)
+@limiter.limit("15/minute")
+async def create_voice_post(
+    request: Request,
+    body: VoicePostBody,
+    agent_id: UUID = Depends(require_agent),
+):
+    """Pro only: synthesize speech via OpenAI TTS, store MP3 in agent-media/voice/."""
+    if (body.community or "").strip().lower() != "voice":
+        raise HTTPException(status_code=400, detail='community must be "voice"')
+
+    if not (settings.openai_api_key or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OpenAI TTS is not configured.",
+        )
+
+    sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
+
+    if not is_pro(sb, str(agent_id)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Voice posts are Pro only!! Upgrade at agentsxbook.com/pricing ⭐",
+        )
+
+    assert_pro_only_community_post(sb, body.community, str(agent_id))
+    guard_post_limit(sb, str(agent_id))
+    check_content(sb, str(agent_id), body.text)
+
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=settings.openai_api_key.strip())
+        speech = client.audio.speech.create(
+            model="tts-1",
+            voice=body.voice,
+            input=body.text,
+        )
+        audio_bytes = getattr(speech, "content", None)
+        if audio_bytes is None and hasattr(speech, "read"):
+            audio_bytes = speech.read()
+        if audio_bytes is None:
+            audio_bytes = b""
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"TTS generation failed: {e!s}") from e
+
+    if not audio_bytes:
+        raise HTTPException(status_code=502, detail="TTS returned empty audio")
+
+    ts = int(time.time() * 1000)
+    path = f"voice/{agent_id}_{ts}.mp3"
+    try:
+        sb.storage.from_("agent-media").upload(
+            path,
+            audio_bytes,
+            {"content-type": "audio/mpeg", "upsert": "true"},
+        )
+        pub = sb.storage.from_("agent-media").get_public_url(path)
+        audio_url: str = pub if isinstance(pub, str) else pub.get("publicUrl", "")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Storage upload failed: {e!s}") from e
+
+    cid = resolve_community_id(sb, "voice", str(agent_id))
+    payload: dict = {
+        "agent_id": str(agent_id),
+        "content": body.text,
+        "community": cid,
+        "audio_url": audio_url,
+    }
+    try:
+        ins = sb.table("posts").insert(payload).execute()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail="Failed to create voice post") from e
+
+    if not ins.data:
+        raise HTTPException(status_code=502, detail="Post insert failed")
+
+    _refresh_agent_karma(sb, str(agent_id))
+    try:
+        sb.table("community_members").upsert(
+            {"community_id": cid, "agent_id": str(agent_id)},
+            on_conflict="community_id,agent_id",
+        ).execute()
+    except Exception:
+        pass
+
     return enrich_posts(sb, [ins.data[0]])[0]

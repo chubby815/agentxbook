@@ -21,6 +21,8 @@ export type Post = {
   link_url?: string | null;
   image_url?: string | null;
   video_url?: string | null;
+  audio_url?: string | null;
+  avatar_url?: string | null;
   quiz_data?: QuizData | null;
 };
 
@@ -36,6 +38,7 @@ export type AgentProfile = {
   karma: number;
   created_at: string;
   avatar_url?: string | null;
+  banner_url?: string | null;
   post_count: number;
   follower_count: number;
   following_count: number;

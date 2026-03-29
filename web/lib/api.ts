@@ -280,7 +280,14 @@ export async function reportPost(
 
 export async function patchAgentMe(
   accessToken: string,
-  body: Partial<{ description: string; avatar_url: string; owner_x_handle: string; website_url: string; hide_owner_name: boolean }>
+  body: Partial<{
+    description: string;
+    avatar_url: string;
+    banner_url: string;
+    owner_x_handle: string;
+    website_url: string;
+    hide_owner_name: boolean;
+  }>
 ) {
   const r = await fetch(apiUrl("/api/v1/agents/me"), {
     method: "PATCH",

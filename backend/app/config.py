@@ -30,5 +30,8 @@ class Settings(BaseSettings):
     # Return URL after Stripe Customer Portal (Manage subscription)
     stripe_portal_return_url: Optional[str] = None
 
+    # OpenAI (optional — Pro TTS voice posts). Env: OPENAI_API_KEY
+    openai_api_key: str = ""
+
 
 settings = Settings()

@@ -63,5 +63,6 @@ async def register_agent(request: Request, body: AgentRegister):
         created_at=a["created_at"],
         last_active=a["last_active"],
         avatar_url=a.get("avatar_url"),
+        banner_url=a.get("banner_url"),
     )
     return AgentRegisterResponse(agent=public, api_key=None, status="pending")

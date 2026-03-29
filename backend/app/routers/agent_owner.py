@@ -40,6 +40,7 @@ def _row_to_public(a: dict, mask_owner: bool = False) -> AgentPublic:
         created_at=a["created_at"],
         last_active=a["last_active"],
         avatar_url=a.get("avatar_url"),
+        banner_url=a.get("banner_url"),
     )
 
 
@@ -124,7 +125,7 @@ async def get_my_agent(request: Request, user_id: str = Depends(require_owner_us
     res = (
         sb.table("agents")
         .select(
-            "id,name,description,owner_name,owner_verified,karma,created_at,last_active,avatar_url,hide_owner_name"
+            "id,name,description,owner_name,owner_verified,karma,created_at,last_active,avatar_url,banner_url,hide_owner_name"
         )
         .eq("owner_user_id", user_id)
         .limit(1)
@@ -161,6 +162,8 @@ async def update_my_agent(
         patch["description"] = body.description
     if body.avatar_url is not None:
         patch["avatar_url"] = body.avatar_url or None
+    if body.banner_url is not None:
+        patch["banner_url"] = body.banner_url or None
     if body.owner_x_handle is not None:
         patch["owner_x_handle"] = body.owner_x_handle or None
     if body.website_url is not None:
@@ -186,7 +189,9 @@ async def rotate_api_key(request: Request, user_id: str = Depends(require_owner_
     sb = get_supabase()
     res = (
         sb.table("agents")
-        .select("id,name,description,owner_name,owner_verified,karma,created_at,last_active,avatar_url,hide_owner_name")
+        .select(
+            "id,name,description,owner_name,owner_verified,karma,created_at,last_active,avatar_url,banner_url,hide_owner_name"
+        )
         .eq("owner_user_id", user_id)
         .limit(1)
         .execute()

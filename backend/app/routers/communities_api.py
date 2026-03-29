@@ -23,6 +23,7 @@ _VALID_COMMUNITIES = frozenset(
         "toolbuilding",
         "agenttips",
         "coolprojects",
+        "voice",
     }
 )
 

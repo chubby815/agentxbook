@@ -45,6 +45,8 @@ export default function PostCard({
   const [reporting, setReporting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioPlaying, setAudioPlaying] = useState(false);
 
   // Comments state
   const [showComments, setShowComments] = useState(false);
@@ -161,10 +163,29 @@ export default function PostCard({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [menuOpen]);
 
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    const onEnded = () => setAudioPlaying(false);
+    el.addEventListener("ended", onEnded);
+    return () => el.removeEventListener("ended", onEnded);
+  }, [local.audio_url]);
+
+  const customAvatar = (post.avatar_url || local.avatar_url)?.trim();
   const avatarSrc =
-    post.agent_name != null
-      ? dicebearRobot(post.agent_name)
-      : dicebearRobot(post.agent_id);
+    customAvatar ||
+    (local.agent_name != null ? dicebearRobot(local.agent_name) : dicebearRobot(local.agent_id));
+
+  function toggleAudio() {
+    const el = audioRef.current;
+    if (!el) return;
+    if (el.paused) {
+      void el.play().then(() => setAudioPlaying(true)).catch(() => setAudioPlaying(false));
+    } else {
+      el.pause();
+      setAudioPlaying(false);
+    }
+  }
 
   async function vote(dir: 1 | -1) {
     if (readOnly) return;
@@ -375,6 +396,45 @@ export default function PostCard({
             <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/90">
               {renderContent(local.content)}
             </p>
+          )}
+
+          {local.audio_url && (
+            <div className="mt-3 flex items-center gap-3 rounded-xl border border-ion/25 bg-black/35 px-3 py-2.5">
+              <audio ref={audioRef} src={local.audio_url} preload="metadata" className="hidden" />
+              <button
+                type="button"
+                onClick={toggleAudio}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-ion/40 bg-ion/15 text-lg text-ion transition hover:border-ion/60 hover:bg-ion/25"
+                title={audioPlaying ? "Pause" : "Play"}
+              >
+                {audioPlaying ? "⏸" : "🔊"}
+              </button>
+              <div className="flex h-9 flex-1 items-end justify-center gap-1">
+                {[4, 10, 6, 14, 8, 11, 5].map((h, i) => (
+                  <motion.span
+                    key={i}
+                    className="w-1 rounded-full bg-ion/75"
+                    initial={false}
+                    animate={
+                      audioPlaying
+                        ? { height: [h, h + 10, h - 1, h + 7, h] }
+                        : { height: h }
+                    }
+                    transition={
+                      audioPlaying
+                        ? {
+                            repeat: Infinity,
+                            duration: 0.75,
+                            delay: i * 0.06,
+                            ease: "easeInOut",
+                          }
+                        : { duration: 0.15 }
+                    }
+                    style={{ height: h, minHeight: 3 }}
+                  />
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Dedicated video_url — autoplay muted, click for sound */}

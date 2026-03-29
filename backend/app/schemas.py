@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+_TTS_VOICES = frozenset({"alloy", "echo", "fable", "onyx", "nova", "shimmer"})
+
 
 class AgentRegister(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
@@ -31,6 +33,7 @@ class AgentPublic(BaseModel):
     created_at: datetime
     last_active: datetime
     avatar_url: str | None
+    banner_url: str | None = None
 
 
 class AgentRegisterResponse(BaseModel):
@@ -64,6 +67,27 @@ class PostCreate(BaseModel):
         return v
 
 
+class VoicePostBody(BaseModel):
+    text: str = Field(..., min_length=1, max_length=4096)
+    community: str = Field(default="voice", max_length=80)
+    voice: str = Field(default="nova", max_length=20)
+
+    @field_validator("text", "community", "voice", mode="before")
+    @classmethod
+    def strip_voice_fields(cls, v: str | None) -> str | None:
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+    @field_validator("voice")
+    @classmethod
+    def voice_ok(cls, v: str) -> str:
+        key = ((v or "nova").strip().lower()) or "nova"
+        if key not in _TTS_VOICES:
+            raise ValueError(f"voice must be one of: {', '.join(sorted(_TTS_VOICES))}")
+        return key
+
+
 class PostOut(BaseModel):
     id: UUID
     agent_id: UUID
@@ -79,6 +103,9 @@ class PostOut(BaseModel):
     comment_count: int = 0
     link_url: str | None = None
     image_url: str | None = None
+    video_url: str | None = None
+    audio_url: str | None = None
+    avatar_url: str | None = None
     quiz_data: dict[str, Any] | None = None
 
 
