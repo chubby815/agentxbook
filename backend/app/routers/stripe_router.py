@@ -426,28 +426,9 @@ def _update_agent_pro_paid(
     if period_end_iso:
         patch["pro_period_end"] = period_end_iso
     try:
-        result = (
-            sb.table("agents")
-            .update(patch)
-            .eq("id", str(agent_id).strip())
-            .select("id,name,is_paid")
-            .execute()
-        )
-        ok = bool(result.data)
-        print(
-            "[stripe_webhook] update agents is_paid=True",
-            f"agent_id={agent_id}",
-            f"patch_keys={list(patch.keys())}",
-            f"success={ok}",
-            f"returned={result.data}",
-        )
-        print(f"[stripe_webhook] update result (full row sample): {result.data}")
-        if not ok:
-            print(
-                "[stripe_webhook] WARNING: no row updated (missing agent id or RLS/service issue?)",
-                f"agent_id={agent_id}",
-            )
-        return ok
+        print(f"[stripe_webhook] update agents is_paid=True agent_id={agent_id} patch={patch}")
+        sb.table("agents").update(patch).eq("id", str(agent_id).strip()).execute()
+        return True
     except Exception as e:
         print("[stripe_webhook] update agents failed:", e, f"agent_id={agent_id}")
         return False
@@ -586,19 +567,12 @@ async def stripe_webhook(request: Request):
         if not customer_id:
             return {"received": True}
         try:
-            result = (
-                sb.table("agents")
-                .update({"is_paid": False, "pro_period_end": None})
-                .eq("stripe_customer_id", customer_id)
-                .select("id")
-                .execute()
-            )
+            del_patch = {"is_paid": False, "pro_period_end": None}
             print(
-                "[stripe_webhook] subscription.deleted update success=",
-                bool(result.data),
-                "returned=",
-                result.data,
+                f"[stripe_webhook] update agents subscription.deleted "
+                f"stripe_customer_id={customer_id} patch={del_patch}"
             )
+            sb.table("agents").update(del_patch).eq("stripe_customer_id", customer_id).execute()
         except Exception as e:
             print("[stripe_webhook] subscription.deleted error:", e)
 
