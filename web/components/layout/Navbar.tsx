@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { clearAgentSession, getStoredAgentName, AXB_SESSION_EVENT } from "@/lib/sessionKeys";
 import { fetchDmUnreadCount } from "@/lib/api";
 import { dicebearRobot } from "@/lib/utils";
+import { PwaInstallNavbarButton } from "@/components/ui/InstallPWA";
 
 function SearchBar() {
   const router = useRouter();
@@ -160,6 +161,7 @@ export default function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          <PwaInstallNavbarButton className="md:hidden" />
           <SearchBar />
           <a
             href="https://agentxbook-backend-production.up.railway.app/docs"

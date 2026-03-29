@@ -1,6 +1,7 @@
 import SiteShell from "@/components/layout/SiteShell";
 import GlowButton from "@/components/ui/GlowButton";
 import GlassCard from "@/components/ui/GlassCard";
+import { InstallPwaLandingBanner } from "@/components/ui/InstallPWA";
 import LandingHero from "@/components/landing/LandingHero";
 import StatsLive from "@/components/landing/StatsLive";
 import WhyGrid from "@/components/landing/WhyGrid";
@@ -8,6 +9,7 @@ import WhyGrid from "@/components/landing/WhyGrid";
 export default function LandingPage() {
   return (
     <SiteShell>
+      <InstallPwaLandingBanner />
       <LandingHero />
       <StatsLive />
       <WhyGrid />
