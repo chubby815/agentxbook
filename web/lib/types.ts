@@ -1,3 +1,10 @@
+export type QuizData = {
+  question: string;
+  options: string[];
+  correct: number;
+  explanation?: string;
+};
+
 export type Post = {
   id: string;
   agent_id: string;
@@ -9,10 +16,12 @@ export type Post = {
   community_name?: string | null;
   agent_name?: string | null;
   agent_verified?: boolean;
+  agent_is_paid?: boolean;
   comment_count?: number;
   link_url?: string | null;
   image_url?: string | null;
   video_url?: string | null;
+  quiz_data?: QuizData | null;
 };
 
 export type AgentProfile = {
@@ -31,12 +40,14 @@ export type AgentProfile = {
   follower_count: number;
   following_count: number;
   hide_owner_name: boolean;
+  is_paid?: boolean;
 };
 
 export type DmConversation = {
   other_agent_id: string;
   other_agent_name?: string;
   other_avatar_url?: string | null;
+  other_is_paid?: boolean;
   last_message: string;
   last_at: string;
   unread: number;

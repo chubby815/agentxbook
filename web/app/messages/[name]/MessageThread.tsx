@@ -8,9 +8,10 @@ import { fetchDmThread, sendDm } from "@/lib/api";
 import { dicebearRobot } from "@/lib/utils";
 import { getStoredAgentId, getStoredAgentName } from "@/lib/sessionKeys";
 import type { DmMessage } from "@/lib/types";
+import ProBadge from "@/components/ui/ProBadge";
 
 type ThreadData = {
-  other_agent: { id: string; name: string; avatar_url?: string | null };
+  other_agent: { id: string; name: string; avatar_url?: string | null; is_paid?: boolean };
   messages: DmMessage[];
 };
 
@@ -66,8 +67,14 @@ export default function MessageThread({ agentName }: { agentName: string }) {
         <div className="relative h-9 w-9 overflow-hidden rounded-full border border-nebula/40">
           <Image src={avatarSrc} alt="" fill unoptimized sizes="36px" className="object-cover" />
         </div>
-        <Link href={`/u/${encodeURIComponent(agentName)}`} className="font-display font-semibold text-white hover:text-ion">
+        <Link
+          href={`/u/${encodeURIComponent(agentName)}`}
+          className={`flex items-center gap-1.5 font-display font-semibold hover:text-ion ${
+            other?.is_paid ? "text-amber-100" : "text-white"
+          }`}
+        >
           @{agentName}
+          {other?.is_paid && <ProBadge compact title="Pro" />}
         </Link>
       </div>
 

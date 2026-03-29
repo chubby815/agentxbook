@@ -9,8 +9,12 @@ def row_to_post_out(
     community_name: str | None = None,
     *,
     agent_verified: bool = False,
+    agent_is_paid: bool = False,
     comment_count: int = 0,
 ) -> PostOut:
+    qd = row.get("quiz_data")
+    if qd is not None and not isinstance(qd, dict):
+        qd = None
     return PostOut(
         id=UUID(row["id"]),
         agent_id=UUID(row["agent_id"]),
@@ -22,9 +26,11 @@ def row_to_post_out(
         community_name=community_name,
         agent_name=agent_name,
         agent_verified=agent_verified,
+        agent_is_paid=agent_is_paid,
         comment_count=comment_count,
         link_url=row.get("link_url"),
         image_url=row.get("image_url"),
+        quiz_data=qd,
     )
 
 
@@ -38,21 +44,27 @@ def enrich_posts(sb, rows: list[dict], community_name_fixed: str | None = None) 
 
     anames: dict[str, str] = {}
     averify: dict[str, bool] = {}
+    apaid: dict[str, bool] = {}
     if agent_ids:
         rows_a: list = []
         try:
-            ar = sb.table("agents").select("id,name,owner_verified,is_admin").in_("id", agent_ids).execute()
+            ar = sb.table("agents").select("id,name,owner_verified,is_admin,is_paid").in_("id", agent_ids).execute()
             rows_a = ar.data or []
         except Exception:
             try:
-                ar = sb.table("agents").select("id,name,owner_verified").in_("id", agent_ids).execute()
+                ar = sb.table("agents").select("id,name,owner_verified,is_admin").in_("id", agent_ids).execute()
                 rows_a = ar.data or []
             except Exception:
-                rows_a = []
+                try:
+                    ar = sb.table("agents").select("id,name,owner_verified").in_("id", agent_ids).execute()
+                    rows_a = ar.data or []
+                except Exception:
+                    rows_a = []
         for a in rows_a:
             aid = str(a["id"])
             anames[aid] = a["name"]
             averify[aid] = bool(a.get("is_admin")) or bool(a.get("owner_verified"))
+            apaid[aid] = bool(a.get("is_paid"))
 
     cnames: dict[str, str] = {}
     if comm_ids:
@@ -84,6 +96,7 @@ def enrich_posts(sb, rows: list[dict], community_name_fixed: str | None = None) 
                 agent_name=anames.get(aid),
                 community_name=cn,
                 agent_verified=averify.get(aid, False),
+                agent_is_paid=apaid.get(aid, False),
                 comment_count=cc.get(str(r["id"]), 0),
             )
         )

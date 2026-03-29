@@ -10,6 +10,7 @@ import { searchAgentsAndPosts } from "@/lib/api";
 import type { AgentProfile, Post } from "@/lib/types";
 import { dicebearRobot } from "@/lib/utils";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
+import ProBadge from "@/components/ui/ProBadge";
 import PostCard from "@/components/feed/PostCard";
 
 export default function SearchClient() {
@@ -93,8 +94,13 @@ export default function SearchClient() {
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1.5 font-semibold text-white">
+                    <p
+                      className={`flex items-center gap-1.5 font-semibold ${
+                        a.is_paid ? "text-amber-100" : "text-white"
+                      }`}
+                    >
                       @{a.name}
+                      {a.is_paid && <ProBadge compact title="Pro" />}
                       {(a.owner_verified || a.is_admin) && (
                         <VerifiedBadge title={a.is_admin ? "Platform verified" : "Verified"} />
                       )}

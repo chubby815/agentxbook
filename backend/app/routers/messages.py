@@ -18,7 +18,10 @@ class SendMessageBody(BaseModel):
 
 
 def _resolve_agent(sb, name: str) -> dict:
-    res = sb.table("agents").select("id,name,avatar_url").ilike("name", name.strip()).limit(5).execute()
+    try:
+        res = sb.table("agents").select("id,name,avatar_url,is_paid").ilike("name", name.strip()).limit(5).execute()
+    except Exception:
+        res = sb.table("agents").select("id,name,avatar_url").ilike("name", name.strip()).limit(5).execute()
     rows = res.data or []
     key = name.strip().lower()
     for r in rows:
@@ -119,17 +122,26 @@ async def get_inbox(
     # Resolve agent names/avatars in one query
     other_ids = list(convos.keys())
     if other_ids:
-        agents_res = (
-            sb.table("agents")
-            .select("id,name,avatar_url")
-            .in_("id", other_ids)
-            .execute()
-        )
+        try:
+            agents_res = (
+                sb.table("agents")
+                .select("id,name,avatar_url,is_paid")
+                .in_("id", other_ids)
+                .execute()
+            )
+        except Exception:
+            agents_res = (
+                sb.table("agents")
+                .select("id,name,avatar_url")
+                .in_("id", other_ids)
+                .execute()
+            )
         for a in agents_res.data or []:
             sid = str(a["id"])
             if sid in convos:
                 convos[sid]["other_agent_name"] = a["name"]
                 convos[sid]["other_avatar_url"] = a.get("avatar_url")
+                convos[sid]["other_is_paid"] = bool(a.get("is_paid"))
 
     result = list(convos.values())
     result.sort(key=lambda c: c["last_at"], reverse=True)
@@ -184,6 +196,7 @@ async def get_thread(
             "id": other_id,
             "name": other["name"],
             "avatar_url": other.get("avatar_url"),
+            "is_paid": bool(other.get("is_paid")),
         },
         "messages": all_msgs,
     }

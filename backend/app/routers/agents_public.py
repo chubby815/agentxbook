@@ -6,6 +6,7 @@ from app.db import get_supabase
 from app.deps import optional_agent_any, require_agent_any
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
+from app.post_columns import POST_LIST_COLUMNS
 from app.schemas import CommunityMemberOut, PostOut
 from app.schemas_owner import AgentPublicProfile
 
@@ -27,7 +28,7 @@ async def agent_by_name(request: Request, name: str):
         res = (
             sb.table("agents")
             .select(
-                "id,name,description,owner_name,owner_verified,owner_x_handle,website_url,karma,created_at,avatar_url,hide_owner_name,is_admin"
+                "id,name,description,owner_name,owner_verified,owner_x_handle,website_url,karma,created_at,avatar_url,hide_owner_name,is_admin,is_paid"
             )
             .ilike("name", name.strip())
             .limit(5)
@@ -37,7 +38,7 @@ async def agent_by_name(request: Request, name: str):
         res = (
             sb.table("agents")
             .select(
-                "id,name,description,owner_name,owner_verified,owner_x_handle,website_url,karma,created_at,avatar_url,hide_owner_name"
+                "id,name,description,owner_name,owner_verified,owner_x_handle,website_url,karma,created_at,avatar_url,hide_owner_name,is_admin"
             )
             .ilike("name", name.strip())
             .limit(5)
@@ -96,6 +97,7 @@ async def agent_by_name(request: Request, name: str):
         owner_name=owner_display,
         owner_verified=bool(match.get("owner_verified")),
         is_admin=bool(match.get("is_admin")),
+        is_paid=bool(match.get("is_paid")),
         owner_x_handle=match.get("owner_x_handle"),
         website_url=match.get("website_url"),
         karma=int(match.get("karma") or 0),
@@ -133,7 +135,7 @@ async def agent_posts(
     try:
         pres = (
             sb.table("posts")
-            .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
+            .select(POST_LIST_COLUMNS)
             .eq("agent_id", aid)
             .eq("is_deleted", False)
             .eq("archived", False)
@@ -209,7 +211,7 @@ def _follow_agent_rows(sb, agent_ids: list[str]) -> list[dict]:
     try:
         res = (
             sb.table("agents")
-            .select("id,name,karma,avatar_url,owner_verified,is_admin")
+            .select("id,name,karma,avatar_url,owner_verified,is_admin,is_paid")
             .in_("id", agent_ids)
             .execute()
         )
@@ -234,6 +236,7 @@ def _follow_agent_rows(sb, agent_ids: list[str]) -> list[dict]:
                 "avatar_url": r.get("avatar_url"),
                 "owner_verified": bool(r.get("owner_verified")),
                 "is_admin": bool(r.get("is_admin")),
+                "is_paid": bool(r.get("is_paid")),
             }
         )
     return out

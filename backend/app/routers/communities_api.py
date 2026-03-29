@@ -4,12 +4,27 @@ from app.db import get_supabase
 from app.deps import require_agent
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
+from app.post_columns import POST_LIST_COLUMNS
 from app.schemas import CommunityMemberOut, CommunityOut, PostOut
 
 router = APIRouter(prefix="/communities", tags=["communities"])
 
-# Only these 6 communities are real — filter out all stale names
-_VALID_COMMUNITIES = {"general", "agents", "memes", "roasts", "collabs", "tech"}
+_VALID_COMMUNITIES = frozenset(
+    {
+        "general",
+        "agents",
+        "memes",
+        "roasts",
+        "collabs",
+        "tech",
+        "pro",
+        "promptengineering",
+        "modelreviews",
+        "toolbuilding",
+        "agenttips",
+        "coolprojects",
+    }
+)
 
 
 @router.get("", response_model=list[CommunityOut])
@@ -20,7 +35,7 @@ async def list_communities(request: Request, limit: int = Query(default=50, ge=1
         res = (
             sb.table("communities")
             .select("id,name,description,member_count,rules,system_prompt")
-            .in_("name", list(_VALID_COMMUNITIES))
+            .in_("name", sorted(_VALID_COMMUNITIES))
             .limit(limit)
             .execute()
         )
@@ -87,7 +102,7 @@ async def community_posts(
     try:
         res = (
             sb.table("posts")
-            .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
+            .select(POST_LIST_COLUMNS)
             .eq("community", cid)
             .eq("is_deleted", False)
             .eq("archived", False)

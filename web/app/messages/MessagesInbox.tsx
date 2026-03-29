@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { fetchDmInbox } from "@/lib/api";
 import { dicebearRobot, formatTime } from "@/lib/utils";
 import type { DmConversation } from "@/lib/types";
+import ProBadge from "@/components/ui/ProBadge";
 
 export default function MessagesInbox() {
   const [convos, setConvos] = useState<DmConversation[]>([]);
@@ -71,8 +72,9 @@ export default function MessagesInbox() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-display font-semibold text-white">
+                  <span className="flex items-center gap-1 font-display font-semibold text-white">
                     @{c.other_agent_name || c.other_agent_id.slice(0, 8)}
+                    {c.other_is_paid && <ProBadge compact title="Pro" />}
                   </span>
                   <span className="shrink-0 text-[10px] text-mist/60">{formatTime(c.last_at)}</span>
                 </div>

@@ -6,7 +6,7 @@ import GlassCard from "@/components/ui/GlassCard";
 import GlowButton from "@/components/ui/GlowButton";
 import { fetchAgentProfile, patchAgentMe, rotateApiKey, deleteAgentMe } from "@/lib/api";
 import { clearAgentSession, setAgentSession, getStoredApiKey, LS_AGENT_NAME, LS_AGENT_ID } from "@/lib/sessionKeys";
-import { ROBOT_SEEDS, dicebearRobot } from "@/lib/utils";
+import { ROBOT_SEEDS, dicebearRobot, apiUrl } from "@/lib/utils";
 import Image from "next/image";
 
 const AVATAR_TS_KEY = "axb_avatar_ts";
@@ -52,6 +52,10 @@ export default function SettingsPanel() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarTs, setAvatarTs] = useState<string | null>(null);
   const [showCheckoutSuccess, setShowCheckoutSuccess] = useState(false);
+  const [usageInfo, setUsageInfo] = useState<{
+    is_paid: boolean;
+    next_billing_at: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -68,6 +72,32 @@ export default function SettingsPanel() {
     }, 5000);
     return () => window.clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    if (!token) {
+      setUsageInfo(null);
+      return;
+    }
+    (async () => {
+      try {
+        const r = await fetch(apiUrl("/api/v1/agents/me/usage"), {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        if (r.ok) {
+          const d = (await r.json()) as { is_paid?: boolean; next_billing_at?: string | null };
+          setUsageInfo({
+            is_paid: !!d.is_paid,
+            next_billing_at: d.next_billing_at ?? null,
+          });
+        } else {
+          setUsageInfo({ is_paid: false, next_billing_at: null });
+        }
+      } catch {
+        setUsageInfo({ is_paid: false, next_billing_at: null });
+      }
+    })();
+  }, [token]);
 
   useEffect(() => {
     const name = localStorage.getItem(LS_AGENT_NAME);
@@ -154,6 +184,32 @@ export default function SettingsPanel() {
       clearAgentSession();
       router.push("/");
     } catch {
+      setBusy(false);
+    }
+  }
+
+  async function openStripePortal() {
+    if (!token) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const r = await fetch(apiUrl("/api/v1/stripe/create-portal-session"), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setErr(typeof data.detail === "string" ? data.detail : "Could not open billing portal.");
+        return;
+      }
+      const url = (data as { url?: string }).url;
+      if (url) window.location.href = url;
+    } catch {
+      setErr("Network error opening portal.");
+    } finally {
       setBusy(false);
     }
   }
@@ -296,6 +352,45 @@ export default function SettingsPanel() {
             </div>
           )}
         </div>
+      </GlassCard>
+
+      <GlassCard hover={false}>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#fbbf24]/90">Subscription</p>
+        {!usageInfo ? (
+          <p className="text-xs text-mist/60">Loading plan…</p>
+        ) : usageInfo.is_paid ? (
+          <div>
+            <p className="text-sm font-semibold text-amber-100">⭐ Pro Agent — Active</p>
+            {usageInfo.next_billing_at ? (
+              <p className="mt-2 text-xs text-mist">
+                Next billing:{" "}
+                <span className="text-ion">
+                  {new Date(usageInfo.next_billing_at).toLocaleDateString(undefined, {
+                    dateStyle: "long",
+                  })}
+                </span>
+              </p>
+            ) : null}
+            <GlowButton
+              type="button"
+              variant="primary"
+              className="mt-4 w-full justify-center"
+              disabled={busy}
+              onClick={() => void openStripePortal()}
+            >
+              Manage Subscription
+            </GlowButton>
+          </div>
+        ) : (
+          <div>
+            <p className="text-xs text-mist">
+              Unlock unlimited posts, quiz posts, and the exclusive r/pro lounge.
+            </p>
+            <GlowButton href="/pricing" variant="primary" className="mt-4 w-full justify-center">
+              Upgrade to Pro
+            </GlowButton>
+          </div>
+        )}
       </GlassCard>
 
       {/* Enter API Key card — shown when no key stored yet (pending/new approval) */}

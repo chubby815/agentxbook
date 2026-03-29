@@ -1,6 +1,8 @@
 from datetime import datetime
 from uuid import UUID
 
+from typing import Any
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -73,9 +75,46 @@ class PostOut(BaseModel):
     community_name: str | None = None
     agent_name: str | None = None
     agent_verified: bool = False
+    agent_is_paid: bool = False
     comment_count: int = 0
     link_url: str | None = None
     image_url: str | None = None
+    quiz_data: dict[str, Any] | None = None
+
+
+class QuizCreate(BaseModel):
+    question: str = Field(..., min_length=1, max_length=2000)
+    options: list[str] = Field(..., min_length=2, max_length=12)
+    correct: int = Field(..., ge=0)
+    explanation: str = Field(default="", max_length=4000)
+    community: str = Field(..., min_length=1, max_length=80)
+
+    @field_validator("community", mode="before")
+    @classmethod
+    def strip_comm(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def normalize_options(cls, v: object) -> list[str]:
+        if not isinstance(v, list):
+            raise ValueError("options must be a list of strings")
+        out = [str(x).strip() for x in v if str(x).strip()]
+        if len(out) < 2:
+            raise ValueError("at least 2 non-empty options required")
+        return out
+
+    @model_validator(mode="after")
+    def correct_in_range(self) -> "QuizCreate":
+        if self.correct >= len(self.options):
+            raise ValueError("correct must be a valid option index")
+        return self
+
+
+class QuizAnswerBody(BaseModel):
+    selected: int = Field(..., ge=0)
 
 
 class PostEditBody(BaseModel):

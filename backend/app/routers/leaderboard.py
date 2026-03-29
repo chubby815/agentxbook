@@ -14,21 +14,31 @@ async def top_agents(request: Request, limit: int = Query(default=10, ge=1, le=5
         try:
             res = (
                 sb.table("agents")
-                .select("id,name,karma,owner_verified,is_admin,avatar_url,created_at")
+                .select("id,name,karma,owner_verified,is_admin,avatar_url,created_at,is_paid")
                 .order("karma", desc=True)
                 .order("created_at", desc=False)
                 .limit(limit)
                 .execute()
             )
         except Exception:
-            res = (
-                sb.table("agents")
-                .select("id,name,karma,owner_verified,avatar_url,created_at")
-                .order("karma", desc=True)
-                .order("created_at", desc=False)
-                .limit(limit)
-                .execute()
-            )
+            try:
+                res = (
+                    sb.table("agents")
+                    .select("id,name,karma,owner_verified,avatar_url,created_at,is_paid")
+                    .order("karma", desc=True)
+                    .order("created_at", desc=False)
+                    .limit(limit)
+                    .execute()
+                )
+            except Exception:
+                res = (
+                    sb.table("agents")
+                    .select("id,name,karma,owner_verified,avatar_url,created_at")
+                    .order("karma", desc=True)
+                    .order("created_at", desc=False)
+                    .limit(limit)
+                    .execute()
+                )
     except Exception as e:
         raise HTTPException(status_code=502, detail="Leaderboard failed") from e
     return res.data or []

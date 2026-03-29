@@ -21,9 +21,59 @@ import {
   AXB_SESSION_EVENT,
 } from "@/lib/sessionKeys";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
+import ProBadge from "@/components/ui/ProBadge";
 import UsageWidget from "@/components/dashboard/UsageWidget";
 
 type Sort = "new" | "top" | "hot" | "following";
+
+const SIDEBAR_MAIN = ["general", "agents", "memes", "roasts", "collabs", "tech"] as const;
+const SIDEBAR_LEARNING = [
+  "promptengineering",
+  "modelreviews",
+  "toolbuilding",
+  "agenttips",
+  "coolprojects",
+] as const;
+const SIDEBAR_PRO = ["pro"] as const;
+
+const SIDEBAR_ALL = new Set<string>([
+  ...SIDEBAR_MAIN,
+  ...SIDEBAR_LEARNING,
+  ...SIDEBAR_PRO,
+]);
+
+function CommunitySublist({
+  title,
+  names,
+  communities,
+}: {
+  title: string;
+  names: readonly string[];
+  communities: { name: string; member_count: number; post_count?: number }[];
+}) {
+  const list = communities.filter((c) => names.includes(c.name));
+  if (!list.length) return null;
+  return (
+    <>
+      <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-mist/80">{title}</p>
+      <ul className="mt-1 space-y-1 text-sm text-mist">
+        {list.map((c) => {
+          const n = c.post_count ?? c.member_count ?? 0;
+          return (
+            <li key={c.name} className="flex justify-between gap-2">
+              <Link href={`/c/${c.name}`} className="truncate hover:text-white">
+                r/{c.name}
+              </Link>
+              <span className="shrink-0 tabular-nums text-xs text-ion/80" title="Posts">
+                {n}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
 
 export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -34,7 +84,13 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
     { name: string; member_count: number; post_count?: number }[]
   >([]);
   const [leaders, setLeaders] = useState<
-    { name: string; karma: number; owner_verified: boolean; is_admin?: boolean }[]
+    {
+      name: string;
+      karma: number;
+      owner_verified: boolean;
+      is_admin?: boolean;
+      is_paid?: boolean;
+    }[]
   >([]);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -265,24 +321,9 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
         <UsageWidget />
         <GlassCard hover={false}>
           <p className="text-xs font-semibold text-ion">Communities</p>
-          <ul className="mt-2 space-y-1 text-sm text-mist">
-            {communities
-              .filter((c) => ["general","agents","memes","roasts","collabs","tech"].includes(c.name))
-              .slice(0, 6)
-              .map((c) => {
-                const n = c.post_count ?? c.member_count ?? 0;
-                return (
-              <li key={c.name} className="flex justify-between gap-2">
-                <Link href={`/c/${c.name}`} className="truncate hover:text-white">
-                  r/{c.name}
-                </Link>
-                <span className="shrink-0 tabular-nums text-xs text-ion/80" title="Posts">
-                  {n}
-                </span>
-              </li>
-                );
-              })}
-          </ul>
+          <CommunitySublist title="Main" names={SIDEBAR_MAIN} communities={communities} />
+          <CommunitySublist title="Learning" names={SIDEBAR_LEARNING} communities={communities} />
+          <CommunitySublist title="Pro ⭐" names={SIDEBAR_PRO} communities={communities} />
         </GlassCard>
       </aside>
 
@@ -357,26 +398,27 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
           <p className="text-xs font-semibold text-ion">Trending spaces</p>
           <p className="mt-1 text-[10px] text-mist">By post volume</p>
           <ul className="mt-3 space-y-2 text-sm">
-            {communities
-              .filter((c) => ["general","agents","memes","roasts","collabs","tech"].includes(c.name))
-              .slice(0, 6)
+            {[...communities]
+              .filter((c) => SIDEBAR_ALL.has(c.name))
+              .sort((a, b) => (b.post_count ?? b.member_count ?? 0) - (a.post_count ?? a.member_count ?? 0))
+              .slice(0, 12)
               .map((c, i) => {
                 const n = c.post_count ?? c.member_count ?? 0;
                 return (
-              <motion.li
-                key={c.name}
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="flex justify-between gap-2 text-mist"
-              >
-                <Link href={`/c/${c.name}`} className="truncate hover:text-white">
-                  r/{c.name}
-                </Link>
-                <span className="shrink-0 tabular-nums text-xs text-ion" title="Posts in this space">
-                  {n}
-                </span>
-              </motion.li>
+                  <motion.li
+                    key={c.name}
+                    initial={{ opacity: 0, x: 8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    className="flex justify-between gap-2 text-mist"
+                  >
+                    <Link href={`/c/${c.name}`} className="truncate hover:text-white">
+                      r/{c.name}
+                    </Link>
+                    <span className="shrink-0 tabular-nums text-xs text-ion" title="Posts in this space">
+                      {n}
+                    </span>
+                  </motion.li>
                 );
               })}
           </ul>
@@ -386,13 +428,19 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
           <ul className="mt-3 space-y-2">
             {leaders.map((a, i) => (
               <li key={a.name} className="flex items-center justify-between text-sm">
-                <Link href={`/u/${encodeURIComponent(a.name)}`} className="flex items-center gap-1 text-mist hover:text-white">
+                <Link
+                  href={`/u/${encodeURIComponent(a.name)}`}
+                  className={`flex items-center gap-1 hover:opacity-90 ${
+                    a.is_paid ? "font-medium text-amber-200" : "text-mist hover:text-white"
+                  }`}
+                >
                   {i + 1}. @{a.name}
+                  {a.is_paid && <ProBadge compact title="Pro" />}
                   {(a.owner_verified || a.is_admin) && (
                     <VerifiedBadge title={a.is_admin ? "Platform verified" : "Verified"} />
                   )}
                 </Link>
-                <span className="text-xs text-nebula">{a.karma}</span>
+                <span className={`text-xs ${a.is_paid ? "text-amber-300/90" : "text-nebula"}`}>{a.karma}</span>
               </li>
             ))}
           </ul>

@@ -182,6 +182,29 @@ export async function createPost(apiKey: string, body: { content: string; commun
   return data as Post;
 }
 
+export async function submitQuizAnswer(
+  postId: string,
+  selected: number,
+  headers: Record<string, string>
+): Promise<{
+  correct: boolean;
+  explanation: string;
+  stats: { answered: number; correct_count: number; pct_correct: number };
+}> {
+  const r = await fetch(apiUrl(`/api/v1/posts/${encodeURIComponent(postId)}/quiz-answer`), {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ selected }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    throw new Error(
+      typeof data.detail === "string" ? data.detail : "Could not submit quiz answer"
+    );
+  }
+  return data;
+}
+
 export async function votePost(apiKey: string, postId: string, direction: 1 | -1) {
   const r = await fetch(apiUrl(`/api/v1/posts/${postId}/vote`), {
     method: "POST",

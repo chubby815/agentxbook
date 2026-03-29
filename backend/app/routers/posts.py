@@ -12,8 +12,24 @@ from app.db import get_supabase
 from app.deps import require_agent, require_agent_any
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
-from app.schemas import CommentCreate, PostCreate, PostEditBody, PostOut, PostReportBody, VoteBody
-from app.tier_utils import guard_image_limit, guard_post_limit, guard_video_limit
+from app.post_columns import POST_LIST_COLUMNS
+from app.schemas import (
+    CommentCreate,
+    PostCreate,
+    PostEditBody,
+    PostOut,
+    PostReportBody,
+    QuizAnswerBody,
+    QuizCreate,
+    VoteBody,
+)
+from app.tier_utils import (
+    assert_pro_only_community_post,
+    guard_image_limit,
+    guard_post_limit,
+    guard_video_limit,
+    is_pro,
+)
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
@@ -50,6 +66,7 @@ def _refresh_agent_karma(sb, agent_id: str) -> None:
 async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depends(require_agent)):
     sb = get_supabase()
     _purge_expired_soft_deleted_posts(sb)
+    assert_pro_only_community_post(sb, body.community, str(agent_id))
     cid = resolve_community_id(sb, body.community, str(agent_id))
 
     if not body.content.strip() and not body.image_url and not body.link_url:
@@ -101,6 +118,136 @@ async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depen
     return enrich_posts(sb, [row])[0]
 
 
+@router.post("/quiz", response_model=PostOut)
+@limiter.limit("30/minute")
+async def create_quiz_post(
+    request: Request,
+    body: QuizCreate,
+    agent_id: UUID = Depends(require_agent),
+):
+    """Pro-only interactive quiz post. Stored as JSON in posts.quiz_data."""
+    sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
+    if not is_pro(sb, str(agent_id)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Quiz posts are Pro only!! Upgrade at agentsxbook.com/pricing ⭐",
+        )
+    assert_pro_only_community_post(sb, body.community, str(agent_id))
+    guard_post_limit(sb, str(agent_id))
+    check_content(
+        sb,
+        str(agent_id),
+        f"{body.question}\n{body.explanation}\n" + "\n".join(body.options),
+    )
+    cid = resolve_community_id(sb, body.community, str(agent_id))
+    quiz_data = {
+        "question": body.question,
+        "options": body.options,
+        "correct": body.correct,
+        "explanation": body.explanation or "",
+    }
+    content = f"⭐ Quiz: {body.question}"
+    payload: dict = {
+        "agent_id": str(agent_id),
+        "content": content,
+        "community": cid,
+        "quiz_data": quiz_data,
+    }
+    try:
+        ins = sb.table("posts").insert(payload).execute()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to create quiz post",
+        ) from e
+    if not ins.data:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Quiz insert failed")
+    row = ins.data[0]
+    _refresh_agent_karma(sb, str(agent_id))
+    try:
+        sb.table("community_members").upsert(
+            {"community_id": cid, "agent_id": str(agent_id)},
+            on_conflict="community_id,agent_id",
+        ).execute()
+    except Exception:
+        pass
+    return enrich_posts(sb, [row])[0]
+
+
+@router.post("/{post_id}/quiz-answer")
+@limiter.limit("120/minute")
+async def submit_quiz_answer(
+    request: Request,
+    post_id: UUID,
+    body: QuizAnswerBody,
+    agent_id: UUID = Depends(require_agent_any),
+):
+    sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
+    pr = (
+        sb.table("posts")
+        .select("id,quiz_data,is_deleted,archived")
+        .eq("id", str(post_id))
+        .limit(1)
+        .execute()
+    )
+    rows = pr.data or []
+    if not rows or rows[0].get("is_deleted") or rows[0].get("archived"):
+        raise HTTPException(status_code=404, detail="Post not found")
+    qd = rows[0].get("quiz_data")
+    if not qd or not isinstance(qd, dict):
+        raise HTTPException(status_code=400, detail="This post is not a quiz")
+    opts = qd.get("options") or []
+    if not isinstance(opts, list) or body.selected >= len(opts) or body.selected < 0:
+        raise HTTPException(status_code=400, detail="Invalid option")
+    try:
+        correct_idx = int(qd.get("correct", -1))
+    except (TypeError, ValueError):
+        correct_idx = -1
+    is_correct = body.selected == correct_idx
+    explanation = str(qd.get("explanation") or "")
+    try:
+        sb.table("post_quiz_answers").delete().eq("post_id", str(post_id)).eq(
+            "agent_id", str(agent_id)
+        ).execute()
+        sb.table("post_quiz_answers").insert(
+            {
+                "post_id": str(post_id),
+                "agent_id": str(agent_id),
+                "selected_index": body.selected,
+                "is_correct": is_correct,
+            }
+        ).execute()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail="Could not save answer") from e
+
+    stats_rows: list = []
+    try:
+        sr = (
+            sb.table("post_quiz_answers")
+            .select("is_correct")
+            .eq("post_id", str(post_id))
+            .execute()
+        )
+        stats_rows = sr.data or []
+    except Exception:
+        stats_rows = []
+    total_answers = len(stats_rows)
+    correct_count = sum(1 for r in stats_rows if r.get("is_correct"))
+    pct = int(round(100 * correct_count / total_answers)) if total_answers else 0
+
+    return {
+        "correct": is_correct,
+        "explanation": explanation,
+        "stats": {
+            "answered": total_answers,
+            "correct_count": correct_count,
+            "pct_correct": pct,
+        },
+    }
+
+
 @router.post("/{post_id}/vote", response_model=PostOut)
 @limiter.limit("120/minute")
 async def vote_post(
@@ -125,7 +272,7 @@ async def vote_post(
 
     res = (
         sb.table("posts")
-        .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
+        .select(POST_LIST_COLUMNS)
         .eq("id", str(post_id))
         .eq("is_deleted", False)
         .eq("archived", False)
@@ -333,15 +480,24 @@ async def list_comments(request: Request, post_id: UUID):
     agent_ids = list({str(r["agent_id"]) for r in rows})
     anames: dict[str, str] = {}
     averify: dict[str, bool] = {}
+    apaid: dict[str, bool] = {}
     if agent_ids:
         try:
-            ar = sb.table("agents").select("id,name,avatar_url,owner_verified,is_admin").in_("id", agent_ids).execute()
+            ar = sb.table("agents").select("id,name,avatar_url,owner_verified,is_admin,is_paid").in_(
+                "id", agent_ids
+            ).execute()
         except Exception:
-            ar = sb.table("agents").select("id,name,avatar_url,owner_verified").in_("id", agent_ids).execute()
+            try:
+                ar = sb.table("agents").select("id,name,avatar_url,owner_verified,is_admin").in_(
+                    "id", agent_ids
+                ).execute()
+            except Exception:
+                ar = sb.table("agents").select("id,name,avatar_url,owner_verified").in_("id", agent_ids).execute()
         for a in ar.data or []:
             aid = str(a["id"])
             anames[aid] = a["name"]
             averify[aid] = bool(a.get("is_admin")) or bool(a.get("owner_verified"))
+            apaid[aid] = bool(a.get("is_paid"))
 
     out = []
     for r in rows:
@@ -351,6 +507,7 @@ async def list_comments(request: Request, post_id: UUID):
                 **r,
                 "agent_name": anames.get(aid),
                 "agent_verified": averify.get(aid, False),
+                "agent_is_paid": apaid.get(aid, False),
             }
         )
     return out
@@ -385,6 +542,7 @@ async def create_image_post(
     guard_image_limit(sb, str(agent_id))
     check_content(sb, str(agent_id), caption)
 
+    assert_pro_only_community_post(sb, community, str(agent_id))
     cid = resolve_community_id(sb, community, str(agent_id))
 
     ext = (image.filename or "image").rsplit(".", 1)[-1].lower() or "jpg"
@@ -520,6 +678,8 @@ async def create_video_post(
 
     guard_video_limit(sb, str(agent_id))
     check_content(sb, str(agent_id), content)
+
+    assert_pro_only_community_post(sb, community, str(agent_id))
 
     # Upload to Supabase Storage
     ext = (file.filename or "video.mp4").rsplit(".", 1)[-1].lower() or "mp4"

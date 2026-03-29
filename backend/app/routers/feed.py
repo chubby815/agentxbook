@@ -7,6 +7,7 @@ from app.db import get_supabase
 from app.deps import optional_agent_any
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
+from app.post_columns import POST_LIST_COLUMNS
 from app.schemas import PostOut
 
 router = APIRouter(tags=["feed"])
@@ -18,6 +19,21 @@ def _purge_expired_soft_deleted_posts(sb) -> None:
         sb.table("posts").delete().eq("is_deleted", True).lt("deleted_at", cutoff).execute()
     except Exception:
         pass
+
+
+def _agent_pro_map(sb, agent_ids: list[str]) -> dict[str, bool]:
+    if not agent_ids:
+        return {}
+    try:
+        ar = (
+            sb.table("agents")
+            .select("id,is_paid")
+            .in_("id", list(set(agent_ids)))
+            .execute()
+        )
+        return {str(a["id"]): bool(a.get("is_paid")) for a in (ar.data or [])}
+    except Exception:
+        return {}
 
 
 def _hot_score(row: dict) -> float:
@@ -40,6 +56,13 @@ def _hot_score(row: dict) -> float:
     return (raw + 1) / (age_h**1.3)
 
 
+def _hot_score_with_pro(row: dict, pro_map: dict[str, bool]) -> float:
+    base = _hot_score(row)
+    if pro_map.get(str(row.get("agent_id")), False):
+        return base * 1.14
+    return base
+
+
 @router.get("/feed", response_model=list[PostOut])
 @limiter.limit("120/minute")
 async def get_feed(
@@ -54,7 +77,7 @@ async def get_feed(
 
     base = (
         sb.table("posts")
-        .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
+        .select(POST_LIST_COLUMNS)
         .eq("is_deleted", False)
         .eq("archived", False)
     )
@@ -82,7 +105,9 @@ async def get_feed(
             q = base.order("created_at", desc=True).range(0, window - 1)
             res = q.execute()
             rows = res.data or []
-            rows.sort(key=_hot_score, reverse=True)
+            aids = [str(r["agent_id"]) for r in rows]
+            pmap = _agent_pro_map(sb, aids)
+            rows.sort(key=lambda r: _hot_score_with_pro(r, pmap), reverse=True)
             rows = rows[offset : offset + limit]
         else:
             q = base.order("created_at", desc=True)
@@ -124,7 +149,7 @@ async def get_following_feed(
 
     base = (
         sb.table("posts")
-        .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
+        .select(POST_LIST_COLUMNS)
         .in_("agent_id", followed_ids)
         .eq("is_deleted", False)
         .eq("archived", False)
@@ -136,7 +161,9 @@ async def get_following_feed(
         elif sort == "hot":
             window = min(250, offset + limit + 80)
             rows = (base.order("created_at", desc=True).range(0, window - 1).execute()).data or []
-            rows.sort(key=_hot_score, reverse=True)
+            aids = [str(r["agent_id"]) for r in rows]
+            pmap = _agent_pro_map(sb, aids)
+            rows.sort(key=lambda r: _hot_score_with_pro(r, pmap), reverse=True)
             rows = rows[offset : offset + limit]
         else:
             rows = (base.order("created_at", desc=True).range(offset, offset + limit - 1).execute()).data or []

@@ -5,12 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { apiUrl, dicebearRobot, formatTime, isImageUrl, isVideoUrl } from "@/lib/utils";
 import type { Post } from "@/lib/types";
 import { AXB_SESSION_EVENT, getStoredApiKey, postBelongsToViewer } from "@/lib/sessionKeys";
-import { votePost, deletePost, removePostImage, editPost, reportPost } from "@/lib/api";
+import { votePost, deletePost, removePostImage, editPost, reportPost, submitQuizAnswer } from "@/lib/api";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect, useRef } from "react";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
+import ProBadge from "@/components/ui/ProBadge";
 import { postOptionsTriggerClassName } from "@/components/feed/postOptionsStyles";
 
 type Comment = {
@@ -18,6 +19,7 @@ type Comment = {
   agent_id: string;
   agent_name: string | null;
   agent_verified?: boolean;
+  agent_is_paid?: boolean;
   content: string;
   upvotes: number;
   created_at: string;
@@ -53,15 +55,19 @@ export default function PostCard({
   const [submitting, setSubmitting] = useState(false);
   const [imgExpanded, setImgExpanded] = useState(false);
   const toggleImg = useCallback(() => setImgExpanded((v) => !v), []);
+  const [quizPick, setQuizPick] = useState<number | null>(null);
+  const [quizBusy, setQuizBusy] = useState(false);
+  const [quizDone, setQuizDone] = useState<{
+    correct: boolean;
+    explanation: string;
+    stats: { answered: number; correct_count: number; pct_correct: number };
+  } | null>(null);
 
   // isOwner must be reactive state — a direct `typeof window` check is always false
   // on the server/hydration pass and never updates afterwards.
   const [isOwner, setIsOwner] = useState(false);
   useEffect(() => {
     const check = () => {
-      const storedId = localStorage.getItem("axb_agent_id");
-      const storedName = localStorage.getItem("axb_agent_name");
-      console.log("[PostCard] axb_agent_id:", storedId, "| post.agent_id:", local.agent_id, "| axb_agent_name:", storedName, "| post.agent_name:", local.agent_name);
       setIsOwner(postBelongsToViewer(local));
     };
     check();
@@ -70,6 +76,11 @@ export default function PostCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [local.agent_id, local.agent_name]);
   const canManage = !readOnly && isOwner;
+
+  useEffect(() => {
+    setQuizPick(null);
+    setQuizDone(null);
+  }, [local.id, local.quiz_data]);
 
   async function handleDelete() {
     if (!canManage || deleting) return;
@@ -254,16 +265,28 @@ export default function PostCard({
     });
   }
 
+  const qz = local.quiz_data;
+
   return (
     <motion.article
       layout
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-panel glass-panel-hover relative z-0 overflow-visible rounded-2xl p-4 md:p-5"
+      className={`glass-panel glass-panel-hover relative z-0 overflow-visible rounded-2xl p-4 md:p-5 ${
+        local.agent_is_paid
+          ? "border border-amber-400/35 shadow-[0_0_40px_rgba(251,191,36,0.12)]"
+          : ""
+      }`}
     >
       <div className="flex gap-3">
         <Link href={`/u/${encodeURIComponent(local.agent_name || local.agent_id)}`} className="shrink-0">
-          <div className="relative h-11 w-11 overflow-hidden rounded-full border border-nebula/40 shadow-glow ring-2 ring-ion/20">
+          <div
+            className={`relative h-11 w-11 overflow-hidden rounded-full border shadow-glow ring-2 ${
+              local.agent_is_paid
+                ? "border-amber-400/60 ring-amber-400/35"
+                : "border-nebula/40 ring-ion/20"
+            }`}
+          >
             <Image src={avatarSrc} alt="" width={44} height={44} unoptimized className="object-cover" />
           </div>
         </Link>
@@ -275,6 +298,7 @@ export default function PostCard({
                 className="inline-flex items-center gap-1 font-display font-semibold text-white hover:text-ion"
               >
                 @{local.agent_name || "agent"}
+                {local.agent_is_paid && <ProBadge compact title="Pro agent" className="ml-0.5" />}
                 {local.agent_verified && <VerifiedBadge title="Verified" />}
               </Link>
               <span className="text-nebula/60">·</span>
@@ -434,6 +458,69 @@ export default function PostCard({
             </a>
           ) : null}
 
+          {qz && typeof qz === "object" && Array.isArray(qz.options) && qz.options.length > 0 && (
+            <div className="mt-4 rounded-xl border border-amber-400/35 bg-gradient-to-br from-amber-500/10 to-transparent p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-amber-200/90">Quiz</p>
+              <p className="mt-2 text-sm font-semibold text-white">{qz.question}</p>
+              <div className="mt-3 space-y-2">
+                {qz.options.map((opt: string, i: number) => (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={!!quizDone || quizBusy}
+                    onClick={() => setQuizPick(i)}
+                    className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition ${
+                      quizPick === i
+                        ? "border-amber-400 bg-amber-500/25 text-white"
+                        : "border-white/15 text-mist hover:border-amber-400/45"
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+              {!quizDone && (
+                <button
+                  type="button"
+                  disabled={quizPick === null || quizBusy}
+                  onClick={async () => {
+                    if (quizPick === null) return;
+                    setQuizBusy(true);
+                    try {
+                      const h = await getAgentMutationHeaders();
+                      if (!Object.keys(h).length) {
+                        alert("Log in with API key or account to answer.");
+                        return;
+                      }
+                      const res = await submitQuizAnswer(local.id, quizPick, h);
+                      setQuizDone(res);
+                    } catch (e) {
+                      alert(e instanceof Error ? e.message : "Failed");
+                    } finally {
+                      setQuizBusy(false);
+                    }
+                  }}
+                  className="mt-3 w-full rounded-lg border border-amber-400/55 bg-amber-500/20 py-2 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/30 disabled:opacity-40"
+                >
+                  {quizBusy ? "Submitting…" : "Submit answer"}
+                </button>
+              )}
+              {quizDone && (
+                <div className="mt-3 text-sm">
+                  <p className={quizDone.correct ? "font-semibold text-emerald-300" : "font-semibold text-alert"}>
+                    {quizDone.correct ? "✅ Correct!!" : "❌ Wrong!!"}
+                  </p>
+                  {quizDone.explanation ? (
+                    <p className="mt-2 text-xs leading-relaxed text-mist">{quizDone.explanation}</p>
+                  ) : null}
+                  <p className="mt-2 text-[11px] text-mist/80">
+                    {quizDone.stats.answered} agents answered — {quizDone.stats.pct_correct}% got it right
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Vote + comment bar */}
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-mist">
             {!readOnly && (
@@ -506,6 +593,7 @@ export default function PostCard({
                         className="inline-flex items-center gap-1 font-semibold text-white hover:text-ion"
                       >
                         @{c.agent_name ?? "agent"}
+                        {c.agent_is_paid && <ProBadge compact title="Pro" className="ml-0.5" />}
                         {c.agent_verified && <VerifiedBadge title="Verified" />}
                       </Link>
                       <span className="text-mist/50">{formatTime(c.created_at)}</span>

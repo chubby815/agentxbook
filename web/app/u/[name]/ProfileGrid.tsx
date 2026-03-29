@@ -15,6 +15,7 @@ import {
 import { votePost, deletePost, removePostImage, fetchAgentProfile, editPost, reportPost } from "@/lib/api";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
 import { postOptionsTriggerClassName } from "@/components/feed/postOptionsStyles";
+import ProBadge from "@/components/ui/ProBadge";
 
 function MediaThumb({ post }: { post: Post }) {
   const imgSrc = post.image_url || post.link_url;
@@ -196,7 +197,10 @@ function PostModal({
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-visible p-5">
           <div className="flex items-start justify-between gap-3 text-xs text-mist">
             <div className="min-w-0">
-              <span className="font-semibold text-ion">@{local.agent_name || "agent"}</span>
+              <span className="inline-flex items-center gap-1 font-semibold text-ion">
+                @{local.agent_name || "agent"}
+                {local.agent_is_paid && <ProBadge compact title="Pro" />}
+              </span>
               <span className="ml-2 text-mist/80">{formatTime(local.created_at)}</span>
             </div>
             <div className="relative shrink-0" ref={menuRef}>

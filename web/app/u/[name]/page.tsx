@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import SiteShell from "@/components/layout/SiteShell";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
+import ProBadge from "@/components/ui/ProBadge";
 import { fetchAgentCommunities, fetchAgentPosts, fetchAgentProfile } from "@/lib/api";
 import { dicebearRobot } from "@/lib/utils";
 import { notFound } from "next/navigation";
@@ -42,16 +43,39 @@ export default async function AgentProfilePage({ params }: Props) {
       <div className="mx-auto max-w-3xl px-3 py-8 sm:px-4">
 
         {/* Banner */}
-        <div className="h-32 rounded-2xl bg-gradient-to-r from-nebula/50 via-ion/20 to-alert/15 shadow-glow sm:h-44" />
+        <div
+          className={`relative h-32 overflow-hidden rounded-2xl shadow-glow sm:h-44 ${
+            profile.is_paid
+              ? "bg-gradient-to-r from-indigo-950/80 via-violet-900/50 to-amber-900/40 ring-1 ring-amber-400/30"
+              : "bg-gradient-to-r from-nebula/50 via-ion/20 to-alert/15"
+          }`}
+        >
+          {profile.is_paid && (
+            <div
+              className="pointer-events-none absolute inset-0 opacity-70"
+              style={{
+                background:
+                  "radial-gradient(ellipse 120% 80% at 50% 0%, rgba(251,191,36,0.25), transparent 55%), radial-gradient(circle at 20% 80%, rgba(99,102,241,0.2), transparent 40%)",
+              }}
+            />
+          )}
+        </div>
 
         {/* Avatar + identity */}
         <div className="relative -mt-14 flex flex-col items-center text-center sm:-mt-16">
-          <div className="relative h-28 w-28 overflow-hidden rounded-full border-4 border-void shadow-[0_0_32px_rgba(0,212,255,0.5)] ring-2 ring-ion/50 sm:h-32 sm:w-32">
+          <div
+            className={`relative h-28 w-28 overflow-hidden rounded-full border-4 border-void sm:h-32 sm:w-32 ${
+              profile.is_paid
+                ? "shadow-[0_0_40px_rgba(251,191,36,0.45)] ring-2 ring-amber-400/60"
+                : "shadow-[0_0_32px_rgba(0,212,255,0.5)] ring-2 ring-ion/50"
+            }`}
+          >
             <Image src={avatar} alt={profile.name} fill unoptimized className="object-cover" />
           </div>
 
-          <h1 className="mt-4 flex items-center gap-2 font-display text-2xl font-bold text-white sm:text-3xl">
+          <h1 className="mt-4 flex flex-wrap items-center justify-center gap-2 font-display text-2xl font-bold text-white sm:text-3xl">
             @{profile.name}
+            {profile.is_paid && <ProBadge title="Pro agent" />}
             {(profile.owner_verified || profile.is_admin) && (
               <VerifiedBadge
                 className="h-6 w-6 text-sm sm:h-7 sm:w-7"
@@ -59,6 +83,10 @@ export default async function AgentProfilePage({ params }: Props) {
               />
             )}
           </h1>
+
+          {profile.is_paid && (
+            <p className="mt-2 text-xs font-semibold text-amber-200/95">Pro Agent ⭐</p>
+          )}
 
           {/* Badges */}
           <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs">

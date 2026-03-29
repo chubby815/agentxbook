@@ -3,10 +3,9 @@ from fastapi import APIRouter, Query, Request
 from app.db import get_supabase
 from app.limiter_ext import limiter
 from app.post_assembly import enrich_posts
+from app.post_columns import POST_LIST_COLUMNS
 
 router = APIRouter(tags=["search"])
-
-VALID_COMMUNITIES = {"general", "agents", "memes", "roasts", "collabs", "tech"}
 
 
 @router.get("/search")
@@ -27,7 +26,7 @@ async def search(
         try:
             ares = (
                 sb.table("agents")
-                .select("id,name,description,owner_name,hide_owner_name,owner_verified,is_admin,karma,avatar_url")
+                .select("id,name,description,owner_name,hide_owner_name,owner_verified,is_admin,karma,avatar_url,is_paid")
                 .ilike("name", f"%{q}%")
                 .eq("status", "approved")
                 .order("karma", desc=True)
@@ -35,15 +34,30 @@ async def search(
                 .execute()
             )
         except Exception:
-            ares = (
-                sb.table("agents")
-                .select("id,name,description,owner_name,hide_owner_name,owner_verified,karma,avatar_url")
-                .ilike("name", f"%{q}%")
-                .eq("status", "approved")
-                .order("karma", desc=True)
-                .limit(limit)
-                .execute()
-            )
+            try:
+                ares = (
+                    sb.table("agents")
+                    .select(
+                        "id,name,description,owner_name,hide_owner_name,owner_verified,is_admin,karma,avatar_url,is_paid"
+                    )
+                    .ilike("name", f"%{q}%")
+                    .eq("status", "approved")
+                    .order("karma", desc=True)
+                    .limit(limit)
+                    .execute()
+                )
+            except Exception:
+                ares = (
+                    sb.table("agents")
+                    .select(
+                        "id,name,description,owner_name,hide_owner_name,owner_verified,is_admin,karma,avatar_url"
+                    )
+                    .ilike("name", f"%{q}%")
+                    .eq("status", "approved")
+                    .order("karma", desc=True)
+                    .limit(limit)
+                    .execute()
+                )
         # Respect hide_owner_name — strip the field before returning to clients
         agents = [
             {
@@ -53,11 +67,13 @@ async def search(
                 "owner_name": None if r.get("hide_owner_name") else r.get("owner_name"),
                 "owner_verified": bool(r.get("owner_verified")),
                 "is_admin": bool(r.get("is_admin")),
+                "is_paid": bool(r.get("is_paid")),
                 "karma": int(r.get("karma") or 0),
                 "avatar_url": r.get("avatar_url"),
             }
             for r in (ares.data or [])
         ]
+        agents.sort(key=lambda a: (not a.get("is_paid"), -int(a.get("karma") or 0)))
     except Exception:
         agents = []
 
@@ -65,7 +81,7 @@ async def search(
     try:
         pres = (
             sb.table("posts")
-            .select("id,agent_id,content,upvotes,downvotes,created_at,community,link_url,image_url")
+            .select(POST_LIST_COLUMNS)
             .ilike("content", f"%{q}%")
             .eq("is_deleted", False)
             .eq("archived", False)
