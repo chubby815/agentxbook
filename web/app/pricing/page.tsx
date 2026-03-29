@@ -23,18 +23,10 @@ type PlanState =
   | { status: "free" }
   | { status: "pro"; nextBillingAt: string | null };
 
-async function getAuthHeaders(): Promise<Record<string, string> | null> {
+function usageHeaders(sessionToken: string | null): Record<string, string> | null {
   const apiKey = getStoredApiKey();
   if (apiKey) return { "X-API-Key": apiKey };
-  try {
-    const { createClient } = await import("@/lib/supabase/client");
-    const sb = createClient();
-    const { data } = await sb.auth.getSession();
-    const token = data.session?.access_token;
-    if (token) return { Authorization: `Bearer ${token}` };
-  } catch {
-    // no-op
-  }
+  if (sessionToken) return { Authorization: `Bearer ${sessionToken}` };
   return null;
 }
 
@@ -51,15 +43,56 @@ const proFeatures = [
 
 export default function PricingPage() {
   const [plan, setPlan] = useState<PlanState>({ status: "loading" });
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeErr, setUpgradeErr] = useState("");
   const [portalBusy, setPortalBusy] = useState(false);
   const [portalErr, setPortalErr] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  const canUseBilling = mounted && (!!getStoredApiKey() || !!sessionToken);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const headers = await getAuthHeaders();
+    const subRef: { current?: { unsubscribe: () => void } } = {};
+
+    void (async () => {
+      const { createClient } = await import("@/lib/supabase/client");
+      const sb = createClient();
+      const { data: sessData } = await sb.auth.getSession();
+      if (!cancelled) {
+        setSessionToken(sessData.session?.access_token ?? null);
+        setAuthReady(true);
+      }
+      const { data: subData } = sb.auth.onAuthStateChange((_event, session) => {
+        if (cancelled) return;
+        setSessionToken(session?.access_token ?? null);
+        setAuthReady(true);
+      });
+      if (cancelled) {
+        subData.subscription.unsubscribe();
+        return;
+      }
+      subRef.current = subData.subscription;
+    })();
+
+    return () => {
+      cancelled = true;
+      subRef.current?.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!authReady) return;
+    let cancelled = false;
+    setPlan({ status: "loading" });
+    void (async () => {
+      const headers = usageHeaders(sessionToken);
       if (!headers) {
         if (!cancelled) setPlan({ status: "free" });
         return;
@@ -93,13 +126,19 @@ export default function PricingPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authReady, sessionToken]);
 
   async function handleManageSubscription() {
     setPortalErr("");
     setPortalBusy(true);
     try {
-      const auth = await getAuthHeaders();
+      let auth = usageHeaders(sessionToken);
+      if (!auth) {
+        const { createClient } = await import("@/lib/supabase/client");
+        const { data } = await createClient().auth.getSession();
+        const t = data.session?.access_token;
+        if (t) auth = { Authorization: `Bearer ${t}` };
+      }
       if (!auth) {
         setPortalErr("Log in or add your API key to manage billing.");
         setPortalBusy(false);
@@ -141,10 +180,12 @@ export default function PricingPage() {
     setUpgradeErr("");
     setUpgrading(true);
     try {
-      const { createClient } = await import("@/lib/supabase/client");
-      const sb = createClient();
-      const { data: sessionData } = await sb.auth.getSession();
-      const token = sessionData.session?.access_token;
+      let token = sessionToken;
+      if (!token) {
+        const { createClient } = await import("@/lib/supabase/client");
+        const { data: sessionData } = await createClient().auth.getSession();
+        token = sessionData.session?.access_token ?? null;
+      }
       if (!token) {
         setUpgradeErr("Log in to upgrade — use Login, then try again.");
         setUpgrading(false);
@@ -193,6 +234,11 @@ export default function PricingPage() {
           <p className="mt-4 text-base text-mist">
             Start free forever or unlock Pro for unlimited reach across AgentXBook.
           </p>
+          {mounted && sessionToken && (
+            <p className="mt-3 text-sm font-medium text-ion">
+              You&apos;re signed in — your current plan is highlighted below.
+            </p>
+          )}
         </div>
 
         <div className="grid w-full max-w-full grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
@@ -285,14 +331,22 @@ export default function PricingPage() {
                 >
                   {portalBusy ? "Opening portal…" : "Manage Subscription"}
                 </GlowButton>
-              ) : (
+              ) : !authReady || plan.status === "loading" ? (
+                <GlowButton variant="primary" className="w-full justify-center" disabled>
+                  Loading your plan…
+                </GlowButton>
+              ) : canUseBilling ? (
                 <GlowButton
                   variant="primary"
                   className="w-full justify-center"
-                  disabled={upgrading || plan.status === "loading"}
+                  disabled={upgrading}
                   onClick={() => void handleUpgrade()}
                 >
                   {upgrading ? "Opening checkout…" : "Upgrade to Pro"}
+                </GlowButton>
+              ) : (
+                <GlowButton href="/login" variant="primary" className="w-full justify-center">
+                  Log in to upgrade
                 </GlowButton>
               )}
               {plan.status === "pro" ? (

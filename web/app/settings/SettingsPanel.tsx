@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import GlassCard from "@/components/ui/GlassCard";
 import GlowButton from "@/components/ui/GlowButton";
 import { fetchAgentProfile, patchAgentMe, rotateApiKey, deleteAgentMe } from "@/lib/api";
-import { clearAgentSession, setAgentSession, getStoredApiKey, LS_AGENT_NAME, LS_AGENT_ID } from "@/lib/sessionKeys";
+import {
+  clearAgentSession,
+  setAgentSession,
+  getStoredApiKey,
+  LS_AGENT_NAME,
+  LS_AGENT_ID,
+  AXB_SESSION_EVENT,
+} from "@/lib/sessionKeys";
 import { ROBOT_SEEDS, dicebearRobot, apiUrl } from "@/lib/utils";
 import Image from "next/image";
 
@@ -101,38 +108,72 @@ export default function SettingsPanel() {
   }, [token]);
 
   useEffect(() => {
-    const name = localStorage.getItem(LS_AGENT_NAME);
-    const key = getStoredApiKey();
-    const ts = localStorage.getItem(AVATAR_TS_KEY);
-    setAgentName(name);
-    setStoredKey(key);
-    setAvatarTs(ts);
+    function syncLs() {
+      setAgentName(localStorage.getItem(LS_AGENT_NAME));
+      setStoredKey(getStoredApiKey());
+      setAvatarTs(localStorage.getItem(AVATAR_TS_KEY));
+    }
+    syncLs();
+    window.addEventListener(AXB_SESSION_EVENT, syncLs);
+    return () => window.removeEventListener(AXB_SESSION_EVENT, syncLs);
+  }, []);
 
-    (async () => {
+  // Supabase session: getSession + onAuthStateChange (getSession alone can miss hydrated session).
+  useEffect(() => {
+    let cancelled = false;
+    const subRef: { current?: { unsubscribe: () => void } } = {};
+
+    void (async () => {
+      const { createClient } = await import("@/lib/supabase/client");
+      const sb = createClient();
+      const { data: sessData, error } = await sb.auth.getSession();
+      if (cancelled) return;
+      if (!error) {
+        setToken(sessData.session?.access_token ?? null);
+        setEmail(sessData.session?.user?.email ?? null);
+      }
+      const { data: subData } = sb.auth.onAuthStateChange((_event, session) => {
+        if (cancelled) return;
+        setToken(session?.access_token ?? null);
+        setEmail(session?.user?.email ?? null);
+      });
+      if (cancelled) {
+        subData.subscription.unsubscribe();
+        return;
+      }
+      subRef.current = subData.subscription;
+    })();
+
+    return () => {
+      cancelled = true;
+      subRef.current?.unsubscribe();
+    };
+  }, []);
+
+  // Load profile fields when we have a bearer token (never clear token if this fails).
+  useEffect(() => {
+    if (!token) return;
+    const name = localStorage.getItem(LS_AGENT_NAME) || agentName;
+    if (!name) return;
+    let cancelled = false;
+    void (async () => {
       try {
-        const { createClient } = await import("@/lib/supabase/client");
-        const sb = createClient();
-        const { data } = await sb.auth.getSession();
-        const t = data.session?.access_token ?? null;
-        const userEmail = data.session?.user?.email ?? null;
-        setToken(t);
-        setEmail(userEmail);
-        if (t && name) {
-          const p = await fetchAgentProfile(name);
-          if (p) {
-            setDescription(p.description);
-            setXHandle(p.owner_x_handle || "");
-            setWebsiteUrl(p.website_url || "");
-            setHideOwner(p.hide_owner_name);
-            if (p.avatar_url) setAvatarUrl(p.avatar_url);
-            if (p.banner_url) setBannerUrl(p.banner_url);
-          }
-        }
+        const p = await fetchAgentProfile(name);
+        if (cancelled || !p) return;
+        setDescription(p.description);
+        setXHandle(p.owner_x_handle || "");
+        setWebsiteUrl(p.website_url || "");
+        setHideOwner(p.hide_owner_name);
+        if (p.avatar_url) setAvatarUrl(p.avatar_url);
+        if (p.banner_url) setBannerUrl(p.banner_url);
       } catch {
-        setToken(null);
+        /* profile optional */
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [token, agentName]);
 
   async function handleAvatarFile(f: File | null) {
     if (!f) return;
