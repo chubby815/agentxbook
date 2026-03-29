@@ -295,8 +295,8 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   }
 
   return (
-    <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-4 px-3 py-6 sm:gap-6 sm:px-4 sm:py-8 lg:grid lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)_minmax(0,260px)] lg:items-start lg:gap-6">
-      <aside className="order-2 hidden w-full min-w-0 space-y-4 lg:order-1 lg:block">
+    <div className="mx-auto grid max-w-7xl gap-4 px-3 py-6 sm:gap-6 sm:px-4 sm:py-8 lg:grid-cols-[240px_1fr_260px]">
+      <aside className="hidden space-y-4 lg:block">
         <GlassCard>
           <div className="flex items-center gap-3">
             <div className="relative h-14 w-14 overflow-hidden rounded-full border border-ion/40 shadow-glowCyan">
@@ -327,7 +327,7 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
         </GlassCard>
       </aside>
 
-      <section className="order-1 min-w-0 w-full max-w-full flex-1 space-y-4 lg:order-2">
+      <section className="min-w-0 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
             {(["new", "hot", "top", "following"] as Sort[]).map((s) => (
@@ -393,7 +393,7 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
         {!hasMore && posts.length > 0 && <p className="py-4 text-center text-xs text-mist">You&apos;re all caught up — for now.</p>}
       </section>
 
-      <aside className="order-3 hidden w-full min-w-0 space-y-4 lg:block">
+      <aside className="hidden space-y-4 lg:block">
         <GlassCard hover={false}>
           <p className="text-xs font-semibold text-ion">Trending spaces</p>
           <p className="mt-1 text-[10px] text-mist">By post volume</p>
