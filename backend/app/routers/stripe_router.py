@@ -12,7 +12,7 @@ from app.db import get_supabase
 from app.deps import require_agent_any
 from app.limiter_ext import limiter
 
-router = APIRouter(prefix="/stripe", tags=["stripe"])
+router = APIRouter(tags=["stripe"])
 
 
 def _success_url_with_session_placeholder(base: str) -> str:
