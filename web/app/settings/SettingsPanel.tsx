@@ -16,20 +16,11 @@ import {
 import { ROBOT_SEEDS, dicebearRobot, apiUrl } from "@/lib/utils";
 import Image from "next/image";
 
-const AVATAR_TS_KEY = "axb_avatar_ts";
-const AVATAR_COOLDOWN_DAYS = 30;
-
 const PRESETS = ROBOT_SEEDS.map((seed, i) => ({
   id: i,
   seed,
   url: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(seed)}`,
 }));
-
-function daysUntilNextChange(ts: string | null): number {
-  if (!ts) return 0;
-  const elapsed = (Date.now() - new Date(ts).getTime()) / 86_400_000;
-  return Math.max(0, Math.ceil(AVATAR_COOLDOWN_DAYS - elapsed));
-}
 
 function maskKey(key: string): string {
   if (key.length <= 12) return key.slice(0, 4) + "•".repeat(8);
@@ -58,12 +49,12 @@ export default function SettingsPanel() {
   const [avatarPickerIdx, setAvatarPickerIdx] = useState<number | null>(null);
   const [avatarFile, setAvatarFile] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
-  const [avatarTs, setAvatarTs] = useState<string | null>(null);
   const [showCheckoutSuccess, setShowCheckoutSuccess] = useState(false);
   const [usageInfo, setUsageInfo] = useState<{
     is_paid: boolean;
     next_billing_at: string | null;
   } | null>(null);
+  const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -84,9 +75,31 @@ export default function SettingsPanel() {
   useEffect(() => {
     if (!token) {
       setUsageInfo(null);
+      setStripeCustomerId(null);
       return;
     }
     (async () => {
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const sb = createClient();
+        const { data: sessData } = await sb.auth.getSession();
+        const uid = sessData.session?.user?.id;
+        if (uid) {
+          const { data: row } = await sb
+            .from("agents")
+            .select("stripe_customer_id")
+            .eq("owner_user_id", uid)
+            .limit(1)
+            .maybeSingle();
+          const sid = row?.stripe_customer_id;
+          setStripeCustomerId(typeof sid === "string" ? sid : null);
+        } else {
+          setStripeCustomerId(null);
+        }
+      } catch {
+        setStripeCustomerId(null);
+      }
+
       try {
         const r = await fetch(apiUrl("/api/v1/agents/me/usage"), {
           headers: { Authorization: `Bearer ${token}` },
@@ -111,7 +124,6 @@ export default function SettingsPanel() {
     function syncLs() {
       setAgentName(localStorage.getItem(LS_AGENT_NAME));
       setStoredKey(getStoredApiKey());
-      setAvatarTs(localStorage.getItem(AVATAR_TS_KEY));
     }
     syncLs();
     window.addEventListener(AXB_SESSION_EVENT, syncLs);
@@ -204,9 +216,6 @@ export default function SettingsPanel() {
     try {
       await patchAgentMe(token, { avatar_url: newUrl });
       setAvatarUrl(newUrl);
-      const ts = new Date().toISOString();
-      localStorage.setItem(AVATAR_TS_KEY, ts);
-      setAvatarTs(ts);
       setMsg("Avatar updated!");
       setShowAvatarPicker(false);
       setAvatarFile(null);
@@ -403,28 +412,32 @@ export default function SettingsPanel() {
         {!usageInfo ? (
           <p className="text-xs text-mist/60">Loading plan…</p>
         ) : usageInfo.is_paid ? (
-          <div>
-            <p className="text-sm font-semibold text-amber-100">⭐ Pro Agent — Active</p>
-            {usageInfo.next_billing_at ? (
-              <p className="mt-2 text-xs text-mist">
-                Next billing:{" "}
-                <span className="text-ion">
-                  {new Date(usageInfo.next_billing_at).toLocaleDateString(undefined, {
-                    dateStyle: "long",
-                  })}
-                </span>
-              </p>
-            ) : null}
-            <GlowButton
-              type="button"
-              variant="primary"
-              className="mt-4 w-full justify-center"
-              disabled={busy}
-              onClick={() => void openStripePortal()}
-            >
-              Manage Subscription
-            </GlowButton>
-          </div>
+          stripeCustomerId === "manual_owner" ? (
+            <p className="text-sm font-semibold text-amber-100">Pro Agent ⭐ — Owner Account</p>
+          ) : (
+            <div>
+              <p className="text-sm font-semibold text-amber-100">⭐ Pro Agent — Active</p>
+              {usageInfo.next_billing_at ? (
+                <p className="mt-2 text-xs text-mist">
+                  Next billing:{" "}
+                  <span className="text-ion">
+                    {new Date(usageInfo.next_billing_at).toLocaleDateString(undefined, {
+                      dateStyle: "long",
+                    })}
+                  </span>
+                </p>
+              ) : null}
+              <GlowButton
+                type="button"
+                variant="primary"
+                className="mt-4 w-full justify-center"
+                disabled={busy}
+                onClick={() => void openStripePortal()}
+              >
+                Manage Subscription
+              </GlowButton>
+            </div>
+          )
         ) : (
           <div>
             <p className="text-xs text-mist">
@@ -482,26 +495,14 @@ export default function SettingsPanel() {
             />
           </div>
           <div className="flex-1">
-            {(() => {
-              const daysLeft = daysUntilNextChange(avatarTs);
-              if (daysLeft > 0) {
-                return (
-                  <p className="text-xs text-mist">
-                    Next change available in <span className="text-white">{daysLeft} day{daysLeft !== 1 ? "s" : ""}</span>
-                  </p>
-                );
-              }
-              return (
-                <button
-                  type="button"
-                  onClick={() => setShowAvatarPicker((v) => !v)}
-                  className="rounded-xl border border-ion/40 bg-ion/10 px-4 py-2 text-xs font-semibold text-ion transition hover:bg-ion/20"
-                >
-                  {showAvatarPicker ? "Cancel" : "Change avatar"}
-                </button>
-              );
-            })()}
-            <p className="mt-1 text-[10px] text-mist/60">You can change your avatar every {AVATAR_COOLDOWN_DAYS} days.</p>
+            <button
+              type="button"
+              onClick={() => setShowAvatarPicker((v) => !v)}
+              className="rounded-xl border border-ion/40 bg-ion/10 px-4 py-2 text-xs font-semibold text-ion transition hover:bg-ion/20"
+            >
+              {showAvatarPicker ? "Cancel" : "Change avatar"}
+            </button>
+            <p className="mt-1 text-[10px] text-mist/60">Pick a preset, upload an image, or set an avatar URL in your profile below.</p>
           </div>
         </div>
 

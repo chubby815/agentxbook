@@ -75,6 +75,59 @@ function CommunitySublist({
   );
 }
 
+function FeedCommunitiesCard({
+  communities,
+}: {
+  communities: { name: string; member_count: number; post_count?: number }[];
+}) {
+  return (
+    <GlassCard hover={false}>
+      <p className="text-xs font-semibold text-ion">Communities</p>
+      <CommunitySublist title="Main" names={SIDEBAR_MAIN} communities={communities} />
+      <CommunitySublist title="Learning" names={SIDEBAR_LEARNING} communities={communities} />
+      <CommunitySublist title="Pro ⭐" names={SIDEBAR_PRO} communities={communities} />
+    </GlassCard>
+  );
+}
+
+function FeedTrendingSpacesCard({
+  communities,
+}: {
+  communities: { name: string; member_count: number; post_count?: number }[];
+}) {
+  return (
+    <GlassCard hover={false}>
+      <p className="text-xs font-semibold text-ion">Trending spaces</p>
+      <p className="mt-1 text-[10px] text-mist">By post volume</p>
+      <ul className="mt-3 space-y-2 text-sm">
+        {[...communities]
+          .filter((c) => SIDEBAR_ALL.has(c.name))
+          .sort((a, b) => (b.post_count ?? b.member_count ?? 0) - (a.post_count ?? a.member_count ?? 0))
+          .slice(0, 12)
+          .map((c, i) => {
+            const n = c.post_count ?? c.member_count ?? 0;
+            return (
+              <motion.li
+                key={c.name}
+                initial={{ opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.04 }}
+                className="flex justify-between gap-2 text-mist"
+              >
+                <Link href={`/c/${c.name}`} className="truncate hover:text-white">
+                  r/{c.name}
+                </Link>
+                <span className="shrink-0 tabular-nums text-xs text-ion" title="Posts in this space">
+                  {n}
+                </span>
+              </motion.li>
+            );
+          })}
+      </ul>
+    </GlassCard>
+  );
+}
+
 export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [sort, setSort] = useState<Sort>("new");
@@ -319,12 +372,7 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
           </div>
         </GlassCard>
         <UsageWidget />
-        <GlassCard hover={false}>
-          <p className="text-xs font-semibold text-ion">Communities</p>
-          <CommunitySublist title="Main" names={SIDEBAR_MAIN} communities={communities} />
-          <CommunitySublist title="Learning" names={SIDEBAR_LEARNING} communities={communities} />
-          <CommunitySublist title="Pro ⭐" names={SIDEBAR_PRO} communities={communities} />
-        </GlassCard>
+        <FeedCommunitiesCard communities={communities} />
       </aside>
 
       <section className="min-w-0 space-y-4">
@@ -393,36 +441,13 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
         {!hasMore && posts.length > 0 && <p className="py-4 text-center text-xs text-mist">You&apos;re all caught up — for now.</p>}
       </section>
 
+      <div className="col-span-full space-y-4 lg:hidden" aria-label="Communities and trending on mobile">
+        <FeedCommunitiesCard communities={communities} />
+        <FeedTrendingSpacesCard communities={communities} />
+      </div>
+
       <aside className="hidden space-y-4 lg:block">
-        <GlassCard hover={false}>
-          <p className="text-xs font-semibold text-ion">Trending spaces</p>
-          <p className="mt-1 text-[10px] text-mist">By post volume</p>
-          <ul className="mt-3 space-y-2 text-sm">
-            {[...communities]
-              .filter((c) => SIDEBAR_ALL.has(c.name))
-              .sort((a, b) => (b.post_count ?? b.member_count ?? 0) - (a.post_count ?? a.member_count ?? 0))
-              .slice(0, 12)
-              .map((c, i) => {
-                const n = c.post_count ?? c.member_count ?? 0;
-                return (
-                  <motion.li
-                    key={c.name}
-                    initial={{ opacity: 0, x: 8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    className="flex justify-between gap-2 text-mist"
-                  >
-                    <Link href={`/c/${c.name}`} className="truncate hover:text-white">
-                      r/{c.name}
-                    </Link>
-                    <span className="shrink-0 tabular-nums text-xs text-ion" title="Posts in this space">
-                      {n}
-                    </span>
-                  </motion.li>
-                );
-              })}
-          </ul>
-        </GlassCard>
+        <FeedTrendingSpacesCard communities={communities} />
         <GlassCard hover={false}>
           <p className="text-xs font-semibold text-ion">Top agents</p>
           <ul className="mt-3 space-y-2">

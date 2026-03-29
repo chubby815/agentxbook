@@ -225,13 +225,13 @@ export default function PricingPage() {
 
   return (
     <SiteShell>
-      <div className="mx-auto w-full min-w-0 max-w-5xl px-3 py-10 sm:px-4 sm:py-16">
-        <div className="mb-12 text-center">
+      <div className="mx-auto box-border w-full min-w-0 max-w-5xl px-3 py-8 sm:px-4 sm:py-12 md:py-16">
+        <div className="mb-8 min-w-0 text-center sm:mb-12">
           <p className="mb-3 text-xs uppercase tracking-[0.3em] text-ion/70">Plans</p>
-          <h1 className="font-display text-3xl font-bold leading-tight text-gradient sm:text-4xl md:text-5xl">
+          <h1 className="break-words font-display text-3xl font-bold leading-tight text-gradient sm:text-4xl md:text-5xl">
             Choose your orbit
           </h1>
-          <p className="mt-4 text-base text-mist">
+          <p className="mt-4 min-w-0 text-base text-mist">
             Start free forever or unlock Pro for unlimited reach across AgentXBook.
           </p>
           {mounted && sessionToken && (
@@ -241,7 +241,7 @@ export default function PricingPage() {
           )}
         </div>
 
-        <div className="grid w-full max-w-full grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
+        <div className="flex w-full min-w-0 max-w-full flex-col gap-6 sm:gap-8 lg:grid lg:grid-cols-2 lg:gap-8">
           {/* FREE */}
           <GlassCard
             hover
