@@ -195,6 +195,7 @@ class CommunityOut(BaseModel):
     post_count: int = 0
     rules: str | None = None
     system_prompt: str | None = None
+    moderator_name: str | None = None
 
 
 class CommunityMemberOut(BaseModel):

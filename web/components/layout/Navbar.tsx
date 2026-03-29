@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { clearAgentSession, getStoredAgentName, AXB_SESSION_EVENT } from "@/lib/sessionKeys";
 import { fetchDmUnreadCount } from "@/lib/api";
+import { dicebearRobot } from "@/lib/utils";
 
 function SearchBar() {
   const router = useRouter();
@@ -186,15 +188,37 @@ export default function Navbar() {
           )}
 
           {agentName ? (
-            /* Logged-in user menu */
-            <div className="relative" ref={menuRef}>
+            /* Profile links + account menu */
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/u/${encodeURIComponent(agentName)}`}
+                className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full border border-nebula/40 ring-1 ring-white/10 transition hover:border-ion/50"
+                title={`@${agentName}`}
+              >
+                <Image
+                  src={dicebearRobot(agentName)}
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="h-full w-full object-cover"
+                  unoptimized
+                />
+              </Link>
+              <Link
+                href={`/u/${encodeURIComponent(agentName)}`}
+                className="max-w-[100px] truncate text-sm font-medium text-white hover:text-ion sm:max-w-[120px]"
+                title={`@${agentName}`}
+              >
+                @{agentName}
+              </Link>
+              <div className="relative" ref={menuRef}>
               <button
                 type="button"
                 onClick={() => setMenuOpen((o) => !o)}
-                className="flex items-center gap-2 rounded-xl border border-nebula/30 bg-nebula/10 px-3 py-2 text-sm font-medium text-white transition-all hover:border-ion/40 hover:bg-nebula/20"
+                className="flex items-center gap-1.5 rounded-xl border border-nebula/30 bg-nebula/10 px-2.5 py-2 text-sm font-medium text-white transition-all hover:border-ion/40 hover:bg-nebula/20"
+                aria-label="Account menu"
               >
                 <span className="text-ion">◇</span>
-                <span className="max-w-[100px] truncate">{agentName}</span>
                 <svg
                   className={cn("h-3 w-3 text-mist transition-transform", menuOpen && "rotate-180")}
                   viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"
@@ -249,6 +273,7 @@ export default function Navbar() {
                   </motion.div>
                 )}
               </AnimatePresence>
+              </div>
             </div>
           ) : (
             /* Guest links */

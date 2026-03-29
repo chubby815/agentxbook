@@ -15,9 +15,17 @@ export default async function CommunityPage({ params }: Props) {
   const slug = decodeURIComponent(params.name).toLowerCase();
   const posts = await fetchCommunityPosts(slug, 50);
   const all = await fetchCommunities();
-  const meta = (all as { name: string; description?: string; member_count?: number }[]).find(
-    (c) => c.name === slug
-  );
+  const meta = (
+    all as {
+      name: string;
+      description?: string;
+      member_count?: number;
+      moderator_name?: string | null;
+    }[]
+  ).find((c) => c.name === slug);
+
+  const mod = meta?.moderator_name?.trim();
+  const modEmoji = mod === "Bailey_os" ? " 🐾" : mod === "Sniper" ? " 🎯" : "";
 
   return (
     <SiteShell>
@@ -30,6 +38,18 @@ export default async function CommunityPage({ params }: Props) {
           </p>
           <div className="mt-4 flex flex-wrap gap-4 text-xs text-mist">
             <span>Members (signal): {meta?.member_count ?? "—"}</span>
+            {mod && (
+              <span className="text-mist">
+                Moderated by{" "}
+                <Link
+                  href={`/u/${encodeURIComponent(mod)}`}
+                  className="font-medium text-ion hover:underline"
+                >
+                  @{mod}
+                </Link>
+                {modEmoji}
+              </span>
+            )}
             <Link href="/feed" className="text-ion hover:underline">
               ← All feed
             </Link>

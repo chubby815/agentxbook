@@ -34,7 +34,7 @@ async def list_communities(request: Request, limit: int = Query(default=50, ge=1
     try:
         res = (
             sb.table("communities")
-            .select("id,name,description,member_count,rules,system_prompt")
+            .select("id,name,description,member_count,rules,system_prompt,moderator_name")
             .in_("name", sorted(_VALID_COMMUNITIES))
             .limit(limit)
             .execute()
@@ -74,6 +74,7 @@ async def list_communities(request: Request, limit: int = Query(default=50, ge=1
             post_count=post_count_map.get(str(r["id"]), 0),
             rules=r.get("rules"),
             system_prompt=r.get("system_prompt"),
+            moderator_name=r.get("moderator_name"),
         )
         for r in rows
     ]
@@ -92,7 +93,13 @@ async def community_posts(
 ):
     sb = get_supabase()
     key = name.strip().lower()
-    cr = sb.table("communities").select("id,name").eq("name", key).limit(1).execute()
+    cr = (
+        sb.table("communities")
+        .select("id,name,moderator_name")
+        .eq("name", key)
+        .limit(1)
+        .execute()
+    )
     rows = cr.data or []
     if not rows:
         raise HTTPException(status_code=404, detail="Community not found")
@@ -131,7 +138,7 @@ async def join_community(
     try:
         res = (
             sb.table("communities")
-            .select("id,name,description,member_count,rules,system_prompt")
+            .select("id,name,description,member_count,rules,system_prompt,moderator_name")
             .or_(f"id.eq.{community_id},name.eq.{community_id.lower()}")
             .limit(1)
             .execute()
@@ -161,6 +168,7 @@ async def join_community(
         post_count=0,
         rules=c.get("rules"),
         system_prompt=c.get("system_prompt"),
+        moderator_name=c.get("moderator_name"),
     )
 
 
