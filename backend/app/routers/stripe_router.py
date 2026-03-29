@@ -333,6 +333,87 @@ def _period_end_from_subscription_id(sub_id: str | None) -> str | None:
         return None
 
 
+def _invoice_customer_email(invoice) -> str | None:
+    e = getattr(invoice, "customer_email", None)
+    return str(e).strip() if e else None
+
+
+def _verify_agent_row(sb, agent_id: str) -> list | None:
+    """Return agent row list (id, name, is_paid) or None if missing."""
+    try:
+        result = (
+            sb.table("agents")
+            .select("id,name,is_paid")
+            .eq("id", str(agent_id).strip())
+            .limit(1)
+            .execute()
+        )
+        rows = result.data or []
+        return rows if rows else None
+    except Exception as e:
+        print("[stripe_webhook] verify agent row query failed:", e, f"agent_id={agent_id}")
+        return None
+
+
+def _finalize_agent_id_for_paid(
+    sb,
+    data_obj,
+    resolved_id: str | None,
+    *,
+    is_checkout_session: bool,
+) -> str | None:
+    """
+    Log metadata agent_id, confirm a row exists for resolved_id, else try
+    client_reference_id (checkout) then owner_email from Stripe.
+    """
+    meta = _metadata_dict(data_obj)
+    meta_aid = meta.get("agent_id")
+    print(f"[stripe_webhook] agent_id from metadata: {meta_aid!r}")
+
+    if not resolved_id or not str(resolved_id).strip():
+        print("[stripe_webhook] no resolved agent id before verify; cannot finalize")
+        return None
+
+    aid = str(resolved_id).strip()
+    row = _verify_agent_row(sb, aid)
+    print(f"[stripe_webhook] database query result (by resolved id): {row}")
+
+    if row:
+        return str(row[0]["id"])
+
+    print(f"[stripe_webhook] ERROR: No agent found with id {aid}")
+    print("[stripe_webhook] Trying client_reference_id / email instead...")
+
+    if is_checkout_session:
+        cref = getattr(data_obj, "client_reference_id", None)
+        if cref and str(cref).strip() and str(cref).strip() != aid:
+            cref_s = str(cref).strip()
+            print(f"[stripe_webhook] retry lookup by client_reference_id: {cref_s!r}")
+            row_c = _verify_agent_row(sb, cref_s)
+            print(f"[stripe_webhook] database query result (by client_reference_id): {row_c}")
+            if row_c:
+                return str(row_c[0]["id"])
+
+    email = (
+        _checkout_customer_email(data_obj)
+        if is_checkout_session
+        else _invoice_customer_email(data_obj)
+    )
+    if email:
+        print(f"[stripe_webhook] fallback: find agent by owner_email={email!r}")
+        found = _find_agent_by_owner_email(sb, email)
+        if found:
+            row_e = _verify_agent_row(sb, found)
+            print(f"[stripe_webhook] database query result (by owner_email): {row_e}")
+            if row_e:
+                return str(row_e[0]["id"])
+    else:
+        print("[stripe_webhook] fallback: no customer_email on event for email lookup")
+
+    print("[stripe_webhook] ERROR: could not finalize agent id for paid update")
+    return None
+
+
 def _update_agent_pro_paid(
     sb,
     agent_id: str,
@@ -349,7 +430,7 @@ def _update_agent_pro_paid(
             sb.table("agents")
             .update(patch)
             .eq("id", str(agent_id).strip())
-            .select("id")
+            .select("id,name,is_paid")
             .execute()
         )
         ok = bool(result.data)
@@ -360,6 +441,7 @@ def _update_agent_pro_paid(
             f"success={ok}",
             f"returned={result.data}",
         )
+        print(f"[stripe_webhook] update result (full row sample): {result.data}")
         if not ok:
             print(
                 "[stripe_webhook] WARNING: no row updated (missing agent id or RLS/service issue?)",
@@ -404,7 +486,10 @@ async def stripe_webhook(request: Request):
     except Exception as e:
         print("[stripe_webhook] could not log full event:", e)
 
+    # Service-role client (SUPABASE_SERVICE_KEY) — bypasses RLS for agents updates.
     sb = get_supabase()
+    print("[stripe_webhook] db client: get_supabase() -> service role from settings")
+
     etype = getattr(event, "type", None)
     data_obj = event.data.object
 
@@ -432,7 +517,13 @@ async def stripe_webhook(request: Request):
             print("[stripe_webhook] checkout.session.completed: no agent resolved, skipping update")
             return {"received": True}
 
-        _update_agent_pro_paid(sb, agent_id, customer_id, period_end_iso)
+        final_id = _finalize_agent_id_for_paid(
+            sb, data_obj, agent_id, is_checkout_session=True
+        )
+        if not final_id:
+            return {"received": True}
+
+        _update_agent_pro_paid(sb, final_id, customer_id, period_end_iso)
 
     elif etype == "invoice.payment_succeeded":
         agent_id, how = _resolve_agent_id_invoice(sb, data_obj)
@@ -449,7 +540,13 @@ async def stripe_webhook(request: Request):
             print("[stripe_webhook] invoice.payment_succeeded: no agent resolved, skipping update")
             return {"received": True}
 
-        _update_agent_pro_paid(sb, agent_id, customer_id, period_end_iso)
+        final_id = _finalize_agent_id_for_paid(
+            sb, data_obj, agent_id, is_checkout_session=False
+        )
+        if not final_id:
+            return {"received": True}
+
+        _update_agent_pro_paid(sb, final_id, customer_id, period_end_iso)
 
     elif etype == "customer.subscription.updated":
         cust_raw = getattr(data_obj, "customer", None)
