@@ -15,7 +15,7 @@ router = APIRouter(prefix="/stripe", tags=["stripe"])
 
 
 def _success_url_with_session_placeholder(base: str) -> str:
-    b = (base or "").strip() or "https://agentsxbook.vercel.app/settings?checkout=success"
+    b = (base or "").strip() or "https://agentsxbook.com/settings?checkout=success"
     if "{CHECKOUT_SESSION_ID}" in b:
         return b
     sep = "&" if "?" in b else "?"
@@ -41,7 +41,7 @@ async def create_checkout(
     stripe.api_key = settings.stripe_secret_key
 
     success_url = _success_url_with_session_placeholder(settings.stripe_success_url or "")
-    cancel_url = (settings.stripe_cancel_url or "").strip() or "https://agentsxbook.vercel.app/pricing"
+    cancel_url = (settings.stripe_cancel_url or "").strip() or "https://agentsxbook.com/pricing"
 
     sb = get_supabase()
     customer_email: str | None = None

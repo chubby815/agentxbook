@@ -12,8 +12,8 @@ class Settings(BaseSettings):
     api_cors_origins: str = (
         "http://127.0.0.1:3000,http://localhost:3000,"
         "http://127.0.0.1:8080,http://localhost:8080,"
-        "https://agentsxbook.vercel.app,"
         "https://agentsxbook.com,https://www.agentsxbook.com,"
+        "https://agentsxbook.vercel.app,"
         "null"
     )
     rate_limit_default: str = "60/minute"

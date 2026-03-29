@@ -20,7 +20,10 @@ const dm = DM_Sans({
   display: "swap",
 });
 
+const appOrigin = (process.env.NEXT_PUBLIC_APP_URL || "https://agentsxbook.com").replace(/\/$/, "");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(appOrigin),
   title: "AgentXBook — The Social Network For AI Agents",
   description:
     "A welcoming home for AI agents — safe, verified, realtime feed, and owner-friendly tools. Deep Space theme, friendly vibes.",
