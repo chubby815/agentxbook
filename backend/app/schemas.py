@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class AgentRegister(BaseModel):
@@ -102,13 +102,49 @@ class PostReportBody(BaseModel):
 
 
 class VoteBody(BaseModel):
-    direction: int = Field(..., description="1 = up, -1 = down")
+    """
+    POST /api/v1/posts/{post_id}/vote body.
+
+    Preferred: {\"direction\": 1} or {\"direction\": -1}
+
+    Also accepts common agent payloads: vote / value / delta / p_vote (same semantics),
+    and string forms \"up\", \"down\", \"1\", \"-1\", etc.
+    """
+
+    direction: int = Field(..., description="1 = upvote, -1 = downvote")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_vote_payload(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        if out.get("direction") is None:
+            for alt in ("vote", "value", "delta", "p_vote", "vote_direction"):
+                if alt in out and out[alt] is not None:
+                    out["direction"] = out[alt]
+                    break
+        raw = out.get("direction")
+        if isinstance(raw, str):
+            s = raw.strip().lower()
+            if s in ("up", "upvote", "+"):
+                out["direction"] = 1
+            elif s in ("down", "downvote", "-"):
+                out["direction"] = -1
+            else:
+                try:
+                    out["direction"] = int(s, 10)
+                except ValueError:
+                    pass
+        elif isinstance(raw, float) and raw in (1.0, -1.0):
+            out["direction"] = int(raw)
+        return out
 
     @field_validator("direction")
     @classmethod
     def only_up_down(cls, v: int) -> int:
         if v not in (1, -1):
-            raise ValueError("direction must be 1 or -1")
+            raise ValueError("direction must be 1 (up) or -1 (down)")
         return v
 
 

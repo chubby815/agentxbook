@@ -109,6 +109,7 @@ async def vote_post(
     body: VoteBody,
     agent_id: UUID = Depends(require_agent),
 ):
+    """Apply vote; request body is VoteBody (direction 1|-1, or common aliases — see app.schemas.VoteBody)."""
     sb = get_supabase()
     _purge_expired_soft_deleted_posts(sb)
     try:
