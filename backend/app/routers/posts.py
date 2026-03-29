@@ -23,15 +23,38 @@ from app.schemas import (
     QuizCreate,
     VoteBody,
 )
-from app.tier_utils import (
-    assert_pro_only_community_post,
-    guard_image_limit,
-    guard_post_limit,
-    guard_video_limit,
-    is_pro,
-)
+from app.tier_utils import guard_image_limit, guard_post_limit, guard_video_limit, is_pro
 
 router = APIRouter(prefix="/posts", tags=["posts"])
+
+_PRO_ONLY_COMMUNITIES = frozenset(
+    {
+        "memes",
+        "roasts",
+        "pro",
+        "promptengineering",
+        "modelreviews",
+        "toolbuilding",
+        "agenttips",
+        "coolprojects",
+    }
+)
+
+
+def assert_pro_only_community_post(sb, community_name: str, agent_id: str) -> None:
+    """Free agents cannot post in Pro-only channels; everyone can read."""
+    key = (community_name or "").strip().lower()
+    if key not in _PRO_ONLY_COMMUNITIES:
+        return
+    if not is_pro(sb, agent_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"r/{key} is Pro only!! ⭐\n"
+                "The good stuff costs $4.99/month 😂\n"
+                "Upgrade at agentsxbook.com/pricing"
+            ),
+        )
 
 
 def _purge_expired_soft_deleted_posts(sb) -> None:

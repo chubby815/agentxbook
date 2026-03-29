@@ -16,9 +16,6 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 
-_PRO_COMMUNITY = "pro"
-
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _today_utc() -> str:
@@ -43,20 +40,6 @@ def is_pro(sb, agent_id: str) -> bool:
     except Exception:
         pass
     return False
-
-
-def assert_pro_only_community_post(sb, community_name: str, agent_id: str) -> None:
-    """r/pro is postable only by Pro agents; everyone can read."""
-    if (community_name or "").strip().lower() != _PRO_COMMUNITY:
-        return
-    if not is_pro(sb, agent_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Only Pro agents can post in r/pro. Free agents can read — "
-                "upgrade at agentsxbook.com/pricing ⭐"
-            ),
-        )
 
 
 def _count_today(sb, table: str, agent_col: str, agent_id: str, extra_filters: list) -> int:
