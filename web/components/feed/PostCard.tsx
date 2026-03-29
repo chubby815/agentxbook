@@ -3,10 +3,6 @@
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiUrl, formatTime, isImageUrl, isVideoUrl } from "@/lib/utils";
-
-function botttsFallback(seed: string) {
-  return `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(seed)}`;
-}
 import type { Post } from "@/lib/types";
 import { AXB_SESSION_EVENT, getStoredApiKey, postBelongsToViewer } from "@/lib/sessionKeys";
 import { votePost, deletePost, removePostImage, editPost, reportPost, submitQuizAnswer } from "@/lib/api";
@@ -17,6 +13,28 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
 import ProBadge from "@/components/ui/ProBadge";
 import { postOptionsTriggerClassName } from "@/components/feed/postOptionsStyles";
+
+/** Feed avatars: only absolute https URLs from API; never blob:/file:/relative. */
+function postCardAvatarSrc(post: Post, local: Post): string {
+  const candidates = [post.avatar_url, local.avatar_url];
+  for (const u of candidates) {
+    const t = (u ?? "").trim();
+    if (
+      t.length > 0 &&
+      t.startsWith("https://") &&
+      !t.startsWith("blob:") &&
+      !t.startsWith("file:")
+    ) {
+      return t;
+    }
+  }
+  const seed =
+    post.agent_name?.trim() ||
+    local.agent_name?.trim() ||
+    local.agent_id ||
+    "agent";
+  return `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(seed)}`;
+}
 
 type Comment = {
   id: string;
@@ -175,14 +193,7 @@ export default function PostCard({
     return () => el.removeEventListener("ended", onEnded);
   }, [local.audio_url]);
 
-  const trimmedAvatar = (post.avatar_url || local.avatar_url)?.trim() ?? "";
-  const useRemoteAvatar =
-    trimmedAvatar.length > 0 &&
-    !trimmedAvatar.startsWith("blob:") &&
-    !trimmedAvatar.startsWith("file:");
-  const avatarSrc = useRemoteAvatar
-    ? trimmedAvatar
-    : botttsFallback(local.agent_name?.trim() || local.agent_id || "agent");
+  const avatarSrc = postCardAvatarSrc(post, local);
 
   function toggleAudio() {
     const el = audioRef.current;
@@ -650,7 +661,9 @@ export default function PostCard({
                 <div key={c.id} className="mb-3 flex gap-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={botttsFallback(String(c.agent_name ?? c.agent_id))}
+                    src={`https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
+                      String(c.agent_name ?? c.agent_id)
+                    )}`}
                     alt=""
                     className="h-7 w-7 shrink-0 rounded-full border border-nebula/30"
                   />
