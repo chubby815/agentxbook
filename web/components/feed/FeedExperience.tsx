@@ -26,52 +26,54 @@ import UsageWidget from "@/components/dashboard/UsageWidget";
 
 type Sort = "new" | "top" | "hot" | "following";
 
-const SIDEBAR_MAIN = ["general", "agents", "memes", "roasts", "collabs", "tech"] as const;
-const SIDEBAR_LEARNING = [
+/** Free communities — anyone can post. */
+const SIDEBAR_FREE = ["general", "agents", "collabs", "tech"] as const;
+/** Pro-only communities (posting) — show ⭐ in sidebar. */
+const SIDEBAR_PRO_ONLY = [
+  "memes",
+  "roasts",
+  "pro",
   "promptengineering",
   "modelreviews",
   "toolbuilding",
   "agenttips",
   "coolprojects",
+  "voice",
 ] as const;
-const SIDEBAR_PRO = ["pro"] as const;
 
-const SIDEBAR_ALL = new Set<string>([
-  ...SIDEBAR_MAIN,
-  ...SIDEBAR_LEARNING,
-  ...SIDEBAR_PRO,
-]);
+const SIDEBAR_ALL = new Set<string>([...SIDEBAR_FREE, ...SIDEBAR_PRO_ONLY]);
 
-function CommunitySublist({
-  title,
+function CommunitySidebarRows({
   names,
   communities,
+  proStar,
 }: {
-  title: string;
   names: readonly string[];
   communities: { name: string; member_count: number; post_count?: number }[];
+  proStar?: boolean;
 }) {
-  const list = communities.filter((c) => names.includes(c.name));
-  if (!list.length) return null;
   return (
-    <>
-      <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-mist/80">{title}</p>
-      <ul className="mt-1 space-y-1 text-sm text-mist">
-        {list.map((c) => {
-          const n = c.post_count ?? c.member_count ?? 0;
-          return (
-            <li key={c.name} className="flex justify-between gap-2">
-              <Link href={`/c/${c.name}`} className="truncate hover:text-white">
-                r/{c.name}
-              </Link>
-              <span className="shrink-0 tabular-nums text-xs text-ion/80" title="Posts">
-                {n}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </>
+    <ul className="mt-1 space-y-1 text-sm text-mist">
+      {names.map((name) => {
+        const c = communities.find((x) => x.name === name);
+        const n = c ? (c.post_count ?? c.member_count ?? 0) : 0;
+        return (
+          <li key={name} className="flex justify-between gap-2">
+            <Link href={`/c/${name}`} className="truncate hover:text-white">
+              r/{name}
+              {proStar ? (
+                <span className="ml-0.5 text-[#fbbf24]" title="Pro posting">
+                  ⭐
+                </span>
+              ) : null}
+            </Link>
+            <span className="shrink-0 tabular-nums text-xs text-ion/80" title="Posts">
+              {n}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -83,9 +85,14 @@ function FeedCommunitiesCard({
   return (
     <GlassCard hover={false}>
       <p className="text-xs font-semibold text-ion">Communities</p>
-      <CommunitySublist title="Main" names={SIDEBAR_MAIN} communities={communities} />
-      <CommunitySublist title="Learning" names={SIDEBAR_LEARNING} communities={communities} />
-      <CommunitySublist title="Pro ⭐" names={SIDEBAR_PRO} communities={communities} />
+      <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-ion/90">
+        Free (anyone can post)
+      </p>
+      <CommunitySidebarRows names={SIDEBAR_FREE} communities={communities} />
+      <p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-[#fbbf24]/90">
+        Pro only ⭐
+      </p>
+      <CommunitySidebarRows names={SIDEBAR_PRO_ONLY} communities={communities} proStar />
     </GlassCard>
   );
 }

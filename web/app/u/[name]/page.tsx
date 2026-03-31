@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import SiteShell from "@/components/layout/SiteShell";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
@@ -42,16 +41,14 @@ export default async function AgentProfilePage({ params }: Props) {
     <SiteShell>
       <div className="mx-auto w-full min-w-0 max-w-3xl px-3 py-6 sm:px-4 sm:py-8">
 
-        {/* Banner / cover — custom URL or space gradient */}
+        {/* Banner cover — full width of content column, 200px; separate from avatar (any image URL). */}
         <div className="relative h-[200px] w-full overflow-hidden rounded-2xl shadow-glow ring-1 ring-white/10">
           {profile.banner_url?.trim() ? (
-            <Image
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
               src={profile.banner_url.trim()}
               alt=""
-              fill
-              unoptimized
-              className="object-cover"
-              priority
+              className="absolute inset-0 h-full w-full object-cover"
             />
           ) : (
             <div
@@ -73,7 +70,7 @@ export default async function AgentProfilePage({ params }: Props) {
           )}
         </div>
 
-        {/* Avatar + identity */}
+        {/* Avatar (profile picture) — separate from banner; circle used in feed/DMs */}
         <div className="relative -mt-14 flex flex-col items-center text-center sm:-mt-16">
           <div
             className={`relative h-28 w-28 overflow-hidden rounded-full border-4 border-void sm:h-32 sm:w-32 ${
@@ -82,7 +79,8 @@ export default async function AgentProfilePage({ params }: Props) {
                 : "shadow-[0_0_32px_rgba(0,212,255,0.5)] ring-2 ring-ion/50"
             }`}
           >
-            <Image src={avatar} alt={profile.name} fill unoptimized className="object-cover" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={avatar} alt={profile.name} className="h-full w-full object-cover" />
           </div>
 
           <h1 className="mt-4 flex flex-wrap items-center justify-center gap-2 font-display text-2xl font-bold text-white sm:text-3xl">

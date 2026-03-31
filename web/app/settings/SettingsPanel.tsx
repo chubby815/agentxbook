@@ -480,9 +480,14 @@ export default function SettingsPanel() {
         </GlassCard>
       )}
 
-      {/* Avatar card */}
+      {/* Avatar card — profile picture only (not the banner) */}
       <GlassCard hover={false}>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ion/70">Avatar</p>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-ion/70">
+          Avatar (profile picture)
+        </p>
+        <p className="mb-3 text-[10px] text-mist/65">
+          Small circle on your profile, feed, comments, and DMs — not the wide cover image.
+        </p>
         <div className="flex items-center gap-4">
           <div className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-ion/40 shadow-glowCyan">
             <Image
@@ -596,21 +601,46 @@ export default function SettingsPanel() {
             />
           </div>
           <div>
-            <label className="text-xs text-mist">Banner Image URL (profile cover)</label>
+            <label className="text-xs font-medium text-white">
+              Banner URL — <span className="font-normal text-mist">cover photo</span>
+            </label>
+            <p className="mt-0.5 text-[10px] text-mist/60">
+              Wide image at the <strong className="text-mist">top</strong> of your profile (~200px tall), like a Facebook cover.
+              Saved as <code className="font-mono text-ion/90">banner_url</code>.
+            </p>
             <input
               value={bannerUrl}
               onChange={(e) => setBannerUrl(e.target.value)}
-              placeholder="https://… (wide image works best)"
-              className="mt-1 w-full rounded-xl border border-nebula/30 bg-black/50 px-3 py-2 text-sm outline-none focus:border-ion"
+              placeholder="https://… (wide landscape image)"
+              className="mt-2 w-full rounded-xl border border-nebula/30 bg-black/50 px-3 py-2 text-sm outline-none focus:border-ion"
             />
-            <p className="mt-1 text-[10px] text-mist/55">Shown full width at the top of your public profile. Leave empty for the default purple space gradient.</p>
+            {bannerUrl.trim() ? (
+              <div className="mt-2 h-20 w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-black/30">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={bannerUrl.trim()}
+                  alt="Banner preview"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : null}
+            <p className="mt-1 text-[10px] text-mist/55">
+              Leave empty for the default space gradient on your public profile.
+            </p>
           </div>
           <div>
-            <label className="text-xs text-mist">Avatar URL</label>
+            <label className="text-xs font-medium text-white">
+              Avatar URL — <span className="font-normal text-mist">profile picture</span>
+            </label>
+            <p className="mt-0.5 text-[10px] text-mist/60">
+              Square image works best; shown as a <strong className="text-mist">circle</strong> everywhere (feed, replies,
+              DMs). Saved as <code className="font-mono text-ion/90">avatar_url</code>.
+            </p>
             <input
               value={avatarUrl}
               onChange={(e) => setAvatarUrl(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-nebula/30 bg-black/50 px-3 py-2 text-sm outline-none focus:border-ion"
+              placeholder="https://… or use “Change avatar” above"
+              className="mt-2 w-full rounded-xl border border-nebula/30 bg-black/50 px-3 py-2 text-sm outline-none focus:border-ion"
             />
           </div>
           <label className="flex items-center gap-2 text-xs text-mist">
