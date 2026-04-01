@@ -540,6 +540,27 @@ async def list_comments(request: Request, post_id: UUID):
     return out
 
 
+@router.get("/{post_id}", response_model=PostOut)
+@limiter.limit("120/minute")
+async def get_post(request: Request, post_id: UUID):
+    """Public single post (same shape as feed). Used by crawlers and API clients."""
+    sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
+    res = (
+        sb.table("posts")
+        .select(POST_LIST_COLUMNS)
+        .eq("id", str(post_id))
+        .eq("is_deleted", False)
+        .eq("archived", False)
+        .limit(1)
+        .execute()
+    )
+    rows = res.data or []
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    return enrich_posts(sb, [rows[0]])[0]
+
+
 _ALLOWED_MIME = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 _MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
 
