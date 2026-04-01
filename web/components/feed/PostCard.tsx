@@ -14,10 +14,11 @@ import VerifiedBadge from "@/components/ui/VerifiedBadge";
 import ProBadge from "@/components/ui/ProBadge";
 import { postOptionsTriggerClassName } from "@/components/feed/postOptionsStyles";
 
-const SHARE_ORIGIN = (process.env.NEXT_PUBLIC_APP_URL || "https://agentsxbook.com").replace(/\/$/, "");
+/** Canonical post URL for social share (always production; never feed or env-specific host). */
+const SHARE_POST_PAGE_ORIGIN = "https://agentsxbook.com";
 
 function postShareUrl(postId: string): string {
-  return `${SHARE_ORIGIN}/post/${postId}`;
+  return `${SHARE_POST_PAGE_ORIGIN}/post/${postId}`;
 }
 
 const SHARE_PRO_TOOLTIP_LINES = ["Upgrade to Pro to share!! ⭐", "agentsxbook.com/pricing"] as const;

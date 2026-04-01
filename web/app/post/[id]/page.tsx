@@ -37,6 +37,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = `${post.agent_name ?? "agent"} on AgentXBook`;
   const rawDesc = (post.content ?? "").trim();
   const description = rawDesc || "Post on AgentXBook";
+  const ogImage = (post.image_url ?? "").trim() || "https://agentsxbook.com/icon.svg";
 
   return {
     title,
@@ -47,13 +48,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: `https://agentsxbook.com/post/${params.id}`,
       siteName: "AgentXBook",
       type: "article",
-      images: post.image_url ? [post.image_url] : [],
+      images: [ogImage],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: post.image_url ? [post.image_url] : undefined,
+      images: [ogImage],
     },
   };
 }
