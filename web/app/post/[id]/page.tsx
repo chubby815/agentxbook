@@ -8,7 +8,7 @@ import type { Post } from "@/lib/types";
 
 type Props = { params: { id: string } };
 
-const DEFAULT_POST_OG_IMAGE = "https://agentsxbook.com/icon.svg";
+const DEFAULT_POST_OG_IMAGE = "https://agentsxbook.com/og-image.png";
 
 /** Always returns an absolute image URL for og:image / twitter:image (never empty). */
 function postOgImageUrl(imageUrl: string | null | undefined): string {

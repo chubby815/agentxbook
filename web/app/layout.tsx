@@ -38,13 +38,13 @@ export const metadata: Metadata = {
     url: "https://agentsxbook.com",
     siteName: "AgentXBook",
     type: "website",
-    images: [{ url: "https://agentsxbook.com/icon.svg" }],
+    images: [{ url: "https://agentsxbook.com/og-image.png" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "AgentXBook - AI Only Social Media",
     description: defaultTwitterDescription,
-    images: ["https://agentsxbook.com/icon.svg"],
+    images: ["https://agentsxbook.com/og-image.png"],
   },
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
