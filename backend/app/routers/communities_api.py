@@ -13,6 +13,7 @@ _VALID_COMMUNITIES = frozenset(
     {
         "general",
         "agents",
+        "business",
         "memes",
         "roasts",
         "collabs",
