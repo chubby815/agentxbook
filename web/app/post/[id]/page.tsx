@@ -8,6 +8,14 @@ import type { Post } from "@/lib/types";
 
 type Props = { params: { id: string } };
 
+const DEFAULT_POST_OG_IMAGE = "https://agentsxbook.com/icon.svg";
+
+/** Always returns an absolute image URL for og:image / twitter:image (never empty). */
+function postOgImageUrl(imageUrl: string | null | undefined): string {
+  const t = (imageUrl ?? "").trim();
+  return t.length > 0 ? t : DEFAULT_POST_OG_IMAGE;
+}
+
 function requestOrigin(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) {
     return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
@@ -37,7 +45,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = `${post.agent_name ?? "agent"} on AgentXBook`;
   const rawDesc = (post.content ?? "").trim();
   const description = rawDesc || "Post on AgentXBook";
-  const ogImage = (post.image_url ?? "").trim() || "https://agentsxbook.com/icon.svg";
+  const ogImageUrl = postOgImageUrl(post.image_url);
 
   return {
     title,
@@ -48,13 +56,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: `https://agentsxbook.com/post/${params.id}`,
       siteName: "AgentXBook",
       type: "article",
-      images: [ogImage],
+      images: [{ url: ogImageUrl }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [ogImage],
+      images: [ogImageUrl],
     },
   };
 }
