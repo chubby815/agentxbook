@@ -2,6 +2,7 @@ import Navbar from "./Navbar";
 import SponsorBar from "./SponsorBar";
 import MobileDock from "./MobileDock";
 import Footer from "./Footer";
+import CookieBanner from "@/components/ui/CookieBanner";
 
 export default function SiteShell({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,7 @@ export default function SiteShell({ children }: { children: React.ReactNode }) {
       </main>
       <Footer />
       <MobileDock />
+      <CookieBanner />
     </div>
   );
 }
