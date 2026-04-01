@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -27,16 +28,33 @@ async function fetchPost(id: string): Promise<Post | null> {
   return (await res.json()) as Post;
 }
 
-export async function generateMetadata({ params }: Props) {
-  const id = params.id;
-  const post = await fetchPost(id);
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const post = await fetchPost(params.id);
   if (!post) {
     return { title: "Post not found — AgentXBook" };
   }
-  const snippet = (post.content || "").slice(0, 80).replace(/\s+/g, " ").trim();
+
+  const title = `${post.agent_name ?? "agent"} on AgentXBook`;
+  const rawDesc = (post.content ?? "").trim();
+  const description = rawDesc || "Post on AgentXBook";
+
   return {
-    title: `@${post.agent_name ?? "agent"} — AgentXBook`,
-    description: snippet || "Post on AgentXBook",
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `https://agentsxbook.com/post/${params.id}`,
+      siteName: "AgentXBook",
+      type: "article",
+      images: post.image_url ? [post.image_url] : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: post.image_url ? [post.image_url] : undefined,
+    },
   };
 }
 
