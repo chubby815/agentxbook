@@ -14,6 +14,12 @@ import VerifiedBadge from "@/components/ui/VerifiedBadge";
 import ProBadge from "@/components/ui/ProBadge";
 import { postOptionsTriggerClassName } from "@/components/feed/postOptionsStyles";
 
+const SHARE_ORIGIN = (process.env.NEXT_PUBLIC_APP_URL || "https://agentsxbook.com").replace(/\/$/, "");
+
+function postShareUrl(postId: string): string {
+  return `${SHARE_ORIGIN}/post/${postId}`;
+}
+
 /** Feed avatars: only absolute https URLs from API; never blob:/file:/relative. */
 function postCardAvatarSrc(post: Post, local: Post): string {
   const candidates = [post.avatar_url, local.avatar_url];
@@ -86,6 +92,8 @@ export default function PostCard({
     explanation: string;
     stats: { answered: number; correct_count: number; pct_correct: number };
   } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // isOwner must be reactive state — a direct `typeof window` check is always false
   // on the server/hydration pass and never updates afterwards.
@@ -193,7 +201,27 @@ export default function PostCard({
     return () => el.removeEventListener("ended", onEnded);
   }, [local.audio_url]);
 
+  useEffect(() => {
+    return () => {
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    };
+  }, []);
+
   const avatarSrc = postCardAvatarSrc(post, local);
+  const publicPostUrl = postShareUrl(local.id);
+  const facebookShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(publicPostUrl)}`;
+  const twitterShareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent("CHECK_THIS_OUT")}&url=${encodeURIComponent(publicPostUrl)}`;
+
+  async function copyPostLink() {
+    try {
+      await navigator.clipboard.writeText(publicPostUrl);
+      setLinkCopied(true);
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+      copyResetRef.current = setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }
 
   function toggleAudio() {
     const el = audioRef.current;
@@ -633,6 +661,47 @@ export default function PostCard({
             >
               💬 {local.comment_count ?? 0}
               <span className="text-[10px] text-mist/50">{showComments ? "▲" : "▼"}</span>
+            </button>
+          </div>
+
+          {/* Share — subtle, below votes */}
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2">
+            <span className="text-[10px] uppercase tracking-wider text-mist/45">Share</span>
+            <a
+              href={facebookShareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-[11px] text-mist/80 transition hover:border-nebula/35 hover:text-white"
+              aria-label="Share on Facebook"
+              title="Facebook"
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+              </svg>
+            </a>
+            <a
+              href={twitterShareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-[11px] text-mist/80 transition hover:border-nebula/35 hover:text-white"
+              aria-label="Share on X"
+              title="X"
+            >
+              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden>
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+              </svg>
+            </a>
+            <button
+              type="button"
+              onClick={() => void copyPostLink()}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-white/10 px-2 text-[10px] text-mist/80 transition hover:border-ion/30 hover:text-ion"
+              title="Copy link"
+            >
+              <svg viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+              </svg>
+              {linkCopied ? "Copied!" : "Copy"}
             </button>
           </div>
         </div>
