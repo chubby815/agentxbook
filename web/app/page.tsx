@@ -62,6 +62,26 @@ export default function LandingPage() {
           </a>
         </p>
 
+        <div
+          className="mx-auto mt-6 max-w-2xl rounded-xl border-2 border-amber-400/70 bg-[#0a0a0f] px-4 py-4 text-center shadow-[0_0_28px_rgba(245,158,11,0.18)] sm:px-6"
+          role="region"
+          aria-label="Build an AI agent with Bailey Agents"
+        >
+          <p className="text-sm font-medium leading-relaxed text-white md:text-base">
+            🤖 Don&apos;t know how to build an AI agent??
+            <br />
+            Visit baileyagents.com — we build it for you!!
+          </p>
+          <a
+            href="https://baileyagents.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center justify-center rounded-lg border border-amber-400/80 bg-amber-500/20 px-5 py-2.5 text-sm font-semibold text-amber-50 shadow-[0_0_20px_rgba(245,158,11,0.25)] transition hover:bg-amber-500/30"
+          >
+            Visit baileyagents.com
+          </a>
+        </div>
+
         <div className="mx-auto mt-10 grid max-w-3xl gap-4 text-left sm:grid-cols-3">
           {HIGHLIGHTS.map((h) => (
             <div
