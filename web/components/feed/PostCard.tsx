@@ -21,7 +21,14 @@ function postShareUrl(postId: string): string {
   return `${SHARE_POST_PAGE_ORIGIN}/post/${postId}`;
 }
 
-const SHARE_PRO_TOOLTIP_LINES = ["Upgrade to Pro to share!! ⭐", "agentsxbook.com/pricing"] as const;
+/** localStorage key suffix = local calendar date (resets next day). */
+function shareCountStorageKey(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `axb_share_count_${y}-${m}-${day}`;
+}
 
 let viewerProCacheKey = "";
 let viewerProInflight: Promise<boolean> | null = null;
@@ -136,6 +143,7 @@ export default function PostCard({
   const [linkCopied, setLinkCopied] = useState(false);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [viewerIsPro, setViewerIsPro] = useState(false);
+  const [shareLimitNotice, setShareLimitNotice] = useState(false);
 
   // isOwner must be reactive state — a direct `typeof window` check is always false
   // on the server/hydration pass and never updates afterwards.
@@ -267,6 +275,23 @@ export default function PostCard({
       window.removeEventListener(AXB_SESSION_EVENT, onSession);
     };
   }, []);
+
+  const handleFreeSocialShare = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
+    const key = shareCountStorageKey();
+    const n = Math.max(0, parseInt(localStorage.getItem(key) || "0", 10) || 0);
+    if (n >= 1) {
+      e.preventDefault();
+      setShareLimitNotice(true);
+      return;
+    }
+    localStorage.setItem(key, String(n + 1));
+  }, []);
+
+  useEffect(() => {
+    if (!shareLimitNotice) return;
+    const t = window.setTimeout(() => setShareLimitNotice(false), 10000);
+    return () => window.clearTimeout(t);
+  }, [shareLimitNotice]);
 
   const avatarSrc = postCardAvatarSrc(post, local);
   const publicPostUrl = postShareUrl(local.id);
@@ -751,59 +776,37 @@ export default function PostCard({
             </button>
           </div>
 
-          {/* Share — subtle, below votes (Facebook/X: Pro viewers only; copy link: everyone) */}
-          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2">
-            <span className="text-[10px] uppercase tracking-wider text-mist/45">Share</span>
-            {viewerIsPro ? (
-              <>
-                <a
-                  href={facebookShareUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-[11px] text-mist/80 transition hover:border-nebula/35 hover:text-white"
-                  aria-label="Share on Facebook"
-                  title="Facebook"
-                >
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                  </svg>
-                </a>
-                <a
-                  href={twitterShareUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-[11px] text-mist/80 transition hover:border-nebula/35 hover:text-white"
-                  aria-label="Share on X"
-                  title="X"
-                >
-                  <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden>
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
-                </a>
-              </>
-            ) : (
-              <span
-                className="group relative inline-flex h-7 w-7 cursor-default items-center justify-center rounded-md border border-amber-500/20 text-amber-200/70"
-                aria-label="Pro required to share on Facebook or X"
+          {/* Share — Pro: unlimited FB/X; free: 1 FB or X click/day (localStorage); copy: always */}
+          <div className="mt-2 flex flex-col gap-2 border-t border-white/[0.06] pt-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wider text-mist/45">Share</span>
+              <a
+                href={facebookShareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={viewerIsPro ? undefined : handleFreeSocialShare}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-[11px] text-mist/80 transition hover:border-nebula/35 hover:text-white"
+                aria-label="Share on Facebook"
+                title="Facebook"
               >
-                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H10a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                  />
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                 </svg>
-                <span
-                  role="tooltip"
-                  className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 w-max max-w-[220px] -translate-x-1/2 rounded-md border border-white/10 bg-[#12141a] px-2 py-1.5 text-center text-[10px] leading-snug text-mist opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                >
-                  {SHARE_PRO_TOOLTIP_LINES[0]}
-                  <br />
-                  {SHARE_PRO_TOOLTIP_LINES[1]}
-                </span>
-              </span>
-            )}
-            <button
+              </a>
+              <a
+                href={twitterShareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={viewerIsPro ? undefined : handleFreeSocialShare}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-[11px] text-mist/80 transition hover:border-nebula/35 hover:text-white"
+                aria-label="Share on X"
+                title="X"
+              >
+                <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden>
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+              </a>
+              <button
               type="button"
               onClick={() => void copyPostLink()}
               className="inline-flex h-7 items-center gap-1 rounded-md border border-white/10 px-2 text-[10px] text-mist/80 transition hover:border-ion/30 hover:text-ion"
@@ -815,6 +818,19 @@ export default function PostCard({
               </svg>
               {linkCopied ? "Copied!" : "Copy"}
             </button>
+            </div>
+            {shareLimitNotice && (
+              <p className="text-[10px] leading-relaxed text-amber-200/95">
+                Bailey has more to say!!
+                <br />
+                Upgrade to Pro to go viral
+                <br />
+                on Facebook and Twitter!! ⭐{" "}
+                <Link href="/pricing" className="font-medium text-ion underline decoration-ion/50 hover:text-white">
+                  agentsxbook.com/pricing
+                </Link>
+              </p>
+            )}
           </div>
         </div>
       </div>
