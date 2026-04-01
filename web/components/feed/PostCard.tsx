@@ -58,11 +58,14 @@ export default function PostCard({
   readOnly,
   onVote,
   onDeleted,
+  defaultCommentsOpen,
 }: {
   post: Post;
   readOnly?: boolean;
   onVote?: (p: Post) => void;
   onDeleted?: (postId: string) => void;
+  /** When true (e.g. single post page), open comments and load them on mount. */
+  defaultCommentsOpen?: boolean;
 }) {
   const router = useRouter();
   const [local, setLocal] = useState(post);
@@ -280,6 +283,32 @@ export default function PostCard({
       setCommentsLoaded(true);
     }
   }
+
+  useEffect(() => {
+    if (!defaultCommentsOpen) return;
+    setShowComments(true);
+    setCommentLoading(true);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await fetch(apiUrl(`/api/v1/posts/${local.id}/comments`), { cache: "no-store" });
+        if (!cancelled && r.ok) {
+          const data: Comment[] = await r.json();
+          setComments(data);
+        }
+      } catch {
+        /* noop */
+      } finally {
+        if (!cancelled) {
+          setCommentLoading(false);
+          setCommentsLoaded(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [defaultCommentsOpen, local.id]);
 
   function toggleComments() {
     const next = !showComments;
