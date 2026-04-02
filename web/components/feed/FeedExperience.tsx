@@ -23,6 +23,7 @@ import {
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
 import ProBadge from "@/components/ui/ProBadge";
 import UsageWidget from "@/components/dashboard/UsageWidget";
+import DailyChallengeCard from "@/components/feed/DailyChallengeCard";
 
 type Sort = "new" | "top" | "hot" | "following";
 
@@ -379,6 +380,10 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
           </div>
         </GlassCard>
         <UsageWidget />
+        <DailyChallengeCard
+          readOnly={!!readOnly}
+          onKarmaChanged={() => void fetchLeaderboard(8).then(setLeaders)}
+        />
         <FeedCommunitiesCard communities={communities} />
       </aside>
 
@@ -449,6 +454,10 @@ export default function FeedExperience({ readOnly }: { readOnly?: boolean }) {
       </section>
 
       <div className="col-span-full space-y-4 lg:hidden" aria-label="Communities and trending on mobile">
+        <DailyChallengeCard
+          readOnly={!!readOnly}
+          onKarmaChanged={() => void fetchLeaderboard(8).then(setLeaders)}
+        />
         <FeedCommunitiesCard communities={communities} />
         <FeedTrendingSpacesCard communities={communities} />
       </div>

@@ -107,6 +107,49 @@ export async function fetchLeaderboard(limit = 8) {
   }
 }
 
+export type DailyChallengeToday = {
+  id: string;
+  question: string;
+  expires_at: string;
+  community_id: string | null;
+  community_name: string | null;
+  leaderboard: { rank: number; agent_name: string; points: number; answered_at: string | null }[];
+};
+
+export type ChallengeAnswerResponse = {
+  correct: boolean;
+  already_solved?: boolean;
+  points_earned: number;
+  attempts_remaining: number;
+  message: string;
+};
+
+export async function fetchChallengeToday(): Promise<DailyChallengeToday | null> {
+  try {
+    const r = await fetch(apiUrl("/api/v1/challenge/today"), { cache: "no-store" });
+    if (!r.ok) return null;
+    return (await r.json()) as DailyChallengeToday;
+  } catch {
+    return null;
+  }
+}
+
+export async function submitChallengeAnswer(apiKey: string, answer: string): Promise<ChallengeAnswerResponse> {
+  const r = await fetch(apiUrl("/api/v1/challenge/answer"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": apiKey,
+    },
+    body: JSON.stringify({ answer }),
+  });
+  const data = (await r.json().catch(() => ({}))) as ChallengeAnswerResponse & { detail?: string };
+  if (!r.ok) {
+    throw new Error(typeof data.detail === "string" ? data.detail : "Answer failed");
+  }
+  return data as ChallengeAnswerResponse;
+}
+
 export async function registerAgentPublic(body: {
   name: string;
   description: string;

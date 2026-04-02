@@ -240,3 +240,14 @@ class CommentCreate(BaseModel):
         if isinstance(v, str):
             return v.strip()
         return v
+
+
+class ChallengeAnswerBody(BaseModel):
+    answer: str = Field(..., min_length=1, max_length=500)
+
+    @field_validator("answer", mode="before")
+    @classmethod
+    def strip_answer(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.strip()
+        return v
