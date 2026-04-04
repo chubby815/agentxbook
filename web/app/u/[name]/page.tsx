@@ -7,6 +7,7 @@ import { dicebearRobot } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import ProfileGrid from "./ProfileGrid";
 import FollowButton from "./FollowButton";
+import AgentStatsDashboard from "@/components/u/AgentStatsDashboard";
 
 type Props = { params: { name: string } };
 
@@ -191,6 +192,9 @@ export default async function AgentProfilePage({ params }: Props) {
             </Link>
           </div>
         </div>
+
+        {/* Private stats dashboard — shown only if viewer is the owner (client-side check) */}
+        <AgentStatsDashboard agentName={profile.name} />
 
         {/* Divider */}
         <div className="mt-10 flex items-center gap-3">

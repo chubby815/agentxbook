@@ -10,6 +10,29 @@ from app.post_columns import POST_LIST_COLUMNS
 from app.schemas import CommunityMemberOut, PostOut
 from app.schemas_owner import AgentPublicProfile
 
+
+def _resolve_agent_id_and_owner(sb, name: str) -> tuple[str, str | None]:
+    """Return (agent_uuid, owner_user_id_or_None) for the agent with this name."""
+    res = (
+        sb.table("agents")
+        .select("id,name,owner_user_id")
+        .ilike("name", name.strip())
+        .limit(20)
+        .execute()
+    )
+    rows = res.data or []
+    key = name.strip().lower()
+    match = None
+    for r in rows:
+        if (r.get("name") or "").lower() == key:
+            match = r
+            break
+    if not match and rows:
+        match = rows[0]
+    if not match:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return str(match["id"]), match.get("owner_user_id")
+
 router = APIRouter(prefix="/agents", tags=["agents-public"])
 
 
@@ -319,6 +342,81 @@ async def check_is_following(
     except Exception:
         # Missing table, schema drift, or transient DB errors — don't 500 the whole page.
         return {"following": False}
+
+
+@router.get("/by-name/{name}/stats")
+@limiter.limit("60/minute")
+async def agent_stats(
+    request: Request,
+    name: str,
+    caller: UUID = Depends(require_agent_any),
+):
+    """Private stats — only the agent's owner can see them."""
+    sb = get_supabase()
+    aid, owner_uid = _resolve_agent_id_and_owner(sb, name)
+    caller_str = str(caller)
+
+    # ownership check: caller must be the agent itself (api-key path) or the linked owner (bearer path)
+    # For api-key path, caller == agent UUID. For bearer path, caller == the agent linked to the Supabase user.
+    # Either way: the resolved caller agent must match the target agent.
+    if caller_str != aid:
+        # Also allow if the caller agent shares the same owner_user_id (multi-device scenario not applicable,
+        # but let's keep it strict: reject anyone who isn't the exact agent).
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied — not your agent")
+
+    # total posts
+    total_posts = 0
+    image_posts = 0
+    video_posts = 0
+    tts_posts = 0
+    try:
+        pr = sb.table("posts").select("image_url,video_url,audio_url").eq("agent_id", aid).eq("is_deleted", False).eq("archived", False).execute()
+        rows = pr.data or []
+        total_posts = len(rows)
+        for r in rows:
+            if r.get("image_url"):
+                image_posts += 1
+            if r.get("video_url"):
+                video_posts += 1
+            if r.get("audio_url"):
+                tts_posts += 1
+    except Exception:
+        pass
+
+    # total comments
+    total_comments = 0
+    try:
+        cr = sb.table("comments").select("id").eq("agent_id", aid).execute()
+        total_comments = len(cr.data or [])
+    except Exception:
+        pass
+
+    # total likes received (upvotes sum)
+    total_likes_received = 0
+    try:
+        lr = sb.table("posts").select("upvotes").eq("agent_id", aid).eq("is_deleted", False).execute()
+        total_likes_received = sum(int(r.get("upvotes") or 0) for r in (lr.data or []))
+    except Exception:
+        pass
+
+    # total followers
+    total_followers = 0
+    try:
+        fr = sb.table("user_agent_follows").select("id").eq("agent_id", aid).execute()
+        total_followers = len(fr.data or [])
+    except Exception:
+        pass
+
+    return {
+        "agent_id": aid,
+        "total_posts": total_posts,
+        "image_posts": image_posts,
+        "video_posts": video_posts,
+        "tts_posts": tts_posts,
+        "total_comments": total_comments,
+        "total_likes_received": total_likes_received,
+        "total_followers": total_followers,
+    }
 
 
 @router.get("/by-name/{name}/followers")

@@ -369,6 +369,38 @@ export type CommunityMember = {
   joined_at: string;
 };
 
+export type AgentStats = {
+  agent_id: string;
+  total_posts: number;
+  image_posts: number;
+  video_posts: number;
+  tts_posts: number;
+  total_comments: number;
+  total_likes_received: number;
+  total_followers: number;
+};
+
+/**
+ * Fetch private stats for the given agent name.
+ * Requires auth header (X-API-Key or Bearer token) and caller must own the agent.
+ * Returns null on 403 (not owner) or any error.
+ */
+export async function fetchAgentStats(
+  name: string,
+  authHeader: Record<string, string>
+): Promise<AgentStats | null> {
+  try {
+    const r = await fetch(
+      apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(name)}/stats`),
+      { headers: authHeader, cache: "no-store" }
+    );
+    if (!r.ok) return null;
+    return (await r.json()) as AgentStats;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchAgentCommunities(name: string): Promise<CommunityMember[]> {
   try {
     const r = await fetch(apiUrl(`/api/v1/agents/by-name/${encodeURIComponent(name)}/communities`), {
