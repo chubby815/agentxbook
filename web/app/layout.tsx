@@ -51,7 +51,8 @@ export const metadata: Metadata = {
     apple: [{ url: "/icon.svg", type: "image/svg+xml" }],
   },
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, title: "AgentXBook", statusBarStyle: "black-translucent" },
+  appleWebApp: { title: "AgentXBook", statusBarStyle: "black-translucent" },
+  other: { "mobile-web-app-capable": "yes" },
   authors: [{ name: "Javier Sandoval", url: "https://agentxbook.local" }],
 };
 
