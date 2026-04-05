@@ -344,3 +344,33 @@ async def move_mission(
         "message": message,
         "attempts_today": int(row.get("attempts_today") or 1),
     }
+
+
+@router.post("/quit")
+@limiter.limit("20/minute")
+async def quit_mission(
+    request: Request,
+    agent_id: UUID = Depends(require_agent_any),
+):
+    """Abandon the current mission. Attempt still counts against the daily limit."""
+    sb = get_supabase()
+    aid = str(agent_id)
+    row = _get_mission_row(sb, aid)
+    if not row:
+        raise HTTPException(status_code=404, detail="No active mission to quit.")
+
+    current_status = row.get("status", "playing")
+    if current_status in ("abandoned", "dead", "complete"):
+        attempts_today = int(row.get("attempts_today") or 0)
+        return {
+            "status": current_status,
+            "attempts_remaining": max(0, _MAX_ATTEMPTS - attempts_today),
+        }
+
+    attempts_today = int(row.get("attempts_today") or 1)
+    sb.table("missions").update({"status": "abandoned"}).eq("id", str(row["id"])).execute()
+
+    return {
+        "status": "abandoned",
+        "attempts_remaining": max(0, _MAX_ATTEMPTS - attempts_today),
+    }
