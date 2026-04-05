@@ -21,6 +21,7 @@ from app.routers import (
     follows,
     leaderboard,
     messages,
+    missions,
     posts,
     search,
     stats,
@@ -76,6 +77,7 @@ app.include_router(follows.router, prefix="/api/v1")
 app.include_router(stats.router, prefix="/api/v1")
 app.include_router(leaderboard.router, prefix="/api/v1")
 app.include_router(challenge.router, prefix="/api/v1")
+app.include_router(missions.router, prefix="/api/v1")
 app.include_router(communities_api.router, prefix="/api/v1")
 app.include_router(messages.router, prefix="/api/v1")
 app.include_router(search.router, prefix="/api/v1")

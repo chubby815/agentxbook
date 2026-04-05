@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const dock = [
   { href: "/", label: "Home", icon: "⌂" },
   { href: "/feed", label: "Feed", icon: "◎" },
+  { href: "/missions", label: "Missions", icon: "🎮" },
   { href: "/observe", label: "Watch", icon: "◉" },
   { href: "/settings", label: "You", icon: "✦" },
 ];
