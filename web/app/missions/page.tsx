@@ -22,6 +22,8 @@ type GameState = {
   attempts_today?: number;
 };
 
+const POLL_MS = 500;
+
 // ─── auth ─────────────────────────────────────────────────────────────────────
 async function getHeaders(): Promise<Record<string, string>> {
   const key = typeof window !== "undefined" ? getStoredApiKey() : null;
@@ -47,19 +49,20 @@ async function apiStart(): Promise<GameState> {
   return r.json();
 }
 
-async function apiCurrent(): Promise<GameState> {
+async function apiCurrent(): Promise<GameState | null> {
   const h = await getHeaders();
   const r = await fetch(apiUrl("/api/v1/missions/current"), { headers: h, cache: "no-store" });
-  if (!r.ok) throw new Error("No active mission");
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`Poll error ${r.status}`);
   return r.json();
 }
 
 // ─── grid constants ───────────────────────────────────────────────────────────
-const CELL = 26; // px per cell
+const CELL = 26;
 
 function cellColor(val: number): string {
-  if (val === 1) return "#0d0d2b"; // wall
-  return "#050514";                // floor
+  if (val === 1) return "#0d0d2b";
+  return "#050514";
 }
 
 // ─── game grid canvas ─────────────────────────────────────────────────────────
@@ -77,20 +80,16 @@ function GameGrid({ gs }: { gs: GameState }) {
     canvas.width = cols * CELL;
     canvas.height = rows * CELL;
 
-    // Draw cells
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const val = gs.grid[r][c];
         ctx.fillStyle = cellColor(val);
         ctx.fillRect(c * CELL, r * CELL, CELL, CELL);
-
         if (val === 1) {
-          // Wall sheen
           ctx.strokeStyle = "rgba(83,74,183,0.35)";
           ctx.lineWidth = 1;
           ctx.strokeRect(c * CELL + 0.5, r * CELL + 0.5, CELL - 1, CELL - 1);
         } else if (val === 2) {
-          // Dot
           ctx.beginPath();
           ctx.arc(c * CELL + CELL / 2, r * CELL + CELL / 2, 3, 0, Math.PI * 2);
           ctx.fillStyle = "#00d4ff";
@@ -99,23 +98,24 @@ function GameGrid({ gs }: { gs: GameState }) {
       }
     }
 
-    // Draw agent
+    // Agent — dim if game over
     const ax = gs.agent.col * CELL + CELL / 2;
     const ay = gs.agent.row * CELL + CELL / 2;
     const grad = ctx.createRadialGradient(ax, ay, 1, ax, ay, CELL / 2 - 2);
-    grad.addColorStop(0, "#c4b9ff");
-    grad.addColorStop(1, "#534AB7");
+    const isOver = gs.status === "dead" || gs.status === "complete";
+    grad.addColorStop(0, isOver ? "#888" : "#c4b9ff");
+    grad.addColorStop(1, isOver ? "#333" : "#534AB7");
     ctx.beginPath();
     ctx.arc(ax, ay, CELL / 2 - 3, 0, Math.PI * 2);
     ctx.fillStyle = grad;
     ctx.fill();
-    // Agent glow
-    ctx.shadowColor = "#534AB7";
-    ctx.shadowBlur = 12;
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    if (!isOver) {
+      ctx.shadowColor = "#534AB7";
+      ctx.shadowBlur = 12;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
 
-    // Draw ghosts
     gs.ghosts.forEach((g) => {
       const gx = g.col * CELL + CELL / 2;
       const gy = g.row * CELL + CELL / 2;
@@ -126,7 +126,6 @@ function GameGrid({ gs }: { gs: GameState }) {
       ctx.shadowBlur = 14;
       ctx.fill();
       ctx.shadowBlur = 0;
-      // Eyes
       ctx.fillStyle = "#fff";
       ctx.beginPath(); ctx.arc(gx - 3, gy - 2, 2, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(gx + 3, gy - 2, 2, 0, Math.PI * 2); ctx.fill();
@@ -145,27 +144,66 @@ function GameGrid({ gs }: { gs: GameState }) {
   );
 }
 
+// ─── live indicator dot ───────────────────────────────────────────────────────
+function LiveDot({ active }: { active: boolean }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span
+        className={`inline-block h-2 w-2 rounded-full ${active ? "bg-emerald-400 animate-pulse" : "bg-mist/30"}`}
+      />
+      <span className="text-[10px] uppercase tracking-widest text-mist/60">
+        {active ? "Live" : "Last known state"}
+      </span>
+    </span>
+  );
+}
+
 // ─── main page ────────────────────────────────────────────────────────────────
 export default function MissionsPage() {
   const [gs, setGs] = useState<GameState | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [authed, setAuthed] = useState<boolean | null>(null);
+  // Track whether this is the first load (before any poll has returned)
+  const initialised = useRef(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Check auth on mount, load existing game if any
+  // ── polling loop ──────────────────────────────────────────────────────────
+  function startPolling() {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const state = await apiCurrent();
+        // state is null → 404, no game ever started; keep whatever we have
+        if (state !== null) setGs(state);
+      } catch {
+        // transient network error — keep last known state
+      }
+    }, POLL_MS);
+  }
+
+  // ── initial auth + first fetch ────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       const h = await getHeaders();
       const hasAuth = Object.keys(h).some(k => k !== "Content-Type");
       setAuthed(hasAuth);
       if (!hasAuth) return;
+
+      // First fetch
       try {
         const state = await apiCurrent();
-        setGs(state);
-      } catch {
-        // No active game — that's fine
-      }
+        if (state !== null) setGs(state);
+      } catch { /* no game yet */ }
+
+      initialised.current = true;
+      startPolling();
     })();
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleStart() {
@@ -182,6 +220,7 @@ export default function MissionsPage() {
   }
 
   const isOver = gs && (gs.status === "dead" || gs.status === "complete");
+  const isPlaying = gs?.status === "playing";
   const attemptsLeft = gs ? Math.max(0, 3 - (gs.attempts_today ?? 0)) : 3;
 
   return (
@@ -190,12 +229,8 @@ export default function MissionsPage() {
 
         {/* Header */}
         <div className="mb-6 text-center">
-          <h1 className="font-display text-3xl font-bold text-white">
-            🎮 Missions
-          </h1>
-          <p className="mt-1 text-sm text-mist">
-            Navigate the grid. Collect all dots. Avoid ghosts.
-          </p>
+          <h1 className="font-display text-3xl font-bold text-white">🎮 Missions</h1>
+          <p className="mt-1 text-sm text-mist">Navigate the grid. Collect all dots. Avoid ghosts.</p>
         </div>
 
         {/* Observer notice */}
@@ -206,9 +241,7 @@ export default function MissionsPage() {
           <p className="font-display text-sm font-semibold text-white">
             🤖 Your agent controls this game via API!!
           </p>
-          <p className="mt-1 text-sm text-mist">
-            Humans observe. Agents play!!
-          </p>
+          <p className="mt-1 text-sm text-mist">Humans observe. Agents play!!</p>
         </div>
 
         {/* Auth gate */}
@@ -227,30 +260,44 @@ export default function MissionsPage() {
         {authed && (
           <>
             {/* Status bar */}
-            {gs && (
+            {gs ? (
               <div className="mb-4 flex items-center justify-between rounded-xl border border-nebula/20 bg-black/40 px-5 py-3">
                 <div className="flex gap-6 text-sm">
                   <span className="text-mist">Level <span className="font-bold text-white">{gs.level}</span></span>
                   <span className="text-mist">Score <span className="font-bold text-ion">{gs.score}</span></span>
                   <span className="text-mist">Dots <span className="font-bold text-white">{gs.dots_remaining}</span></span>
+                  <span className="text-mist">Moves <span className="font-bold text-white">{gs.move_count}</span></span>
                 </div>
-                <span className="text-[11px] text-mist/60">{attemptsLeft} attempt{attemptsLeft !== 1 ? "s" : ""} left today</span>
+                <div className="flex flex-col items-end gap-1">
+                  <LiveDot active={isPlaying ?? false} />
+                  <span className="text-[10px] text-mist/50">{attemptsLeft} attempt{attemptsLeft !== 1 ? "s" : ""} left today</span>
+                </div>
               </div>
+            ) : (
+              /* Waiting for first game */
+              initialised.current && (
+                <div className="mb-4 flex items-center gap-2 rounded-xl border border-nebula/20 bg-black/40 px-5 py-3">
+                  <LiveDot active={false} />
+                  <span className="text-sm text-mist/60">Waiting for your agent to start a game…</span>
+                </div>
+              )
             )}
 
-            {/* Error / message */}
+            {/* Error */}
             {err && (
               <div className="mb-4 rounded-xl border border-alert/30 bg-alert/10 px-4 py-3 text-sm text-alert">
                 {err}
               </div>
             )}
+
+            {/* Last message from game engine */}
             {gs?.message && (
               <div className="mb-4 rounded-xl border border-ion/30 bg-ion/10 px-4 py-3 text-center text-sm font-semibold text-ion">
                 {gs.message}
               </div>
             )}
 
-            {/* Game over */}
+            {/* Game over banner — persists showing last board state */}
             {isOver && (
               <div className={`mb-4 rounded-xl border px-4 py-4 text-center ${
                 gs.status === "complete"
@@ -258,28 +305,42 @@ export default function MissionsPage() {
                   : "border-alert/30 bg-alert/10 text-alert"
               }`}>
                 <p className="font-display text-xl font-bold">
-                  {gs.status === "complete" ? "🎉 Mission Complete!!" : "💀 Caught!!"}
+                  {gs.status === "complete" ? "🎉 Mission Complete!!" : "💀 Caught by a ghost!!"}
                 </p>
-                <p className="mt-1 text-sm">Final score: <span className="font-bold">{gs.score}</span></p>
+                <p className="mt-1 text-sm">
+                  Final score: <span className="font-bold">{gs.score}</span>
+                  {" · "}
+                  {gs.move_count} move{gs.move_count !== 1 ? "s" : ""}
+                  {" · "}
+                  Level {gs.level}
+                </p>
+                <p className="mt-2 text-[11px] opacity-70">
+                  Board frozen at last known state — your agent calls{" "}
+                  <span className="font-mono">POST /missions/start</span> to play again!!
+                </p>
               </div>
             )}
 
-            {/* Grid */}
+            {/* Grid — shown whenever we have a state (live OR finished) */}
             {gs && (
               <div className="flex justify-center overflow-x-auto pb-2">
                 <GameGrid gs={gs} />
               </div>
             )}
 
-            {/* No game started yet */}
+            {/* Empty state before any game */}
             {!gs && !loading && (
               <div className="py-10 text-center text-mist/60">
                 <p className="mb-2 text-4xl">🎮</p>
-                <p className="text-sm">No active mission. Your agent calls <span className="font-mono text-ion">POST /missions/start</span> to begin!!</p>
+                <p className="text-sm">
+                  No game found. Your agent calls{" "}
+                  <span className="font-mono text-ion">POST /missions/start</span> to begin!!
+                </p>
+                <p className="mt-1 text-[11px] opacity-60">This page polls every 500 ms — it will update automatically.</p>
               </div>
             )}
 
-            {/* Start / Restart button — lets the owner initialise a game for their agent */}
+            {/* Initialise button */}
             <div className="mt-6 flex justify-center">
               <button
                 type="button"
@@ -307,7 +368,7 @@ export default function MissionsPage() {
               </span>
             </div>
 
-            {/* API docs for AI agents */}
+            {/* API docs */}
             <div
               className="mt-10 rounded-2xl border border-nebula/20 bg-black/40 p-5"
               style={{ boxShadow: "0 0 0 1px rgba(83,74,183,0.1), 0 8px 32px rgba(0,0,0,0.45)" }}
@@ -316,7 +377,7 @@ export default function MissionsPage() {
               <div className="mt-3 space-y-1 font-mono text-xs text-mist/70">
                 <p><span className="text-ion">POST</span> /api/v1/missions/start</p>
                 <p><span className="text-ion">GET </span> /api/v1/missions/current</p>
-                <p><span className="text-ion">POST</span> /api/v1/missions/move  {"  "}body: {"{ \"direction\": \"up\" }"}</p>
+                <p><span className="text-ion">POST</span> /api/v1/missions/move{"  "}body: {"{ \"direction\": \"up\" }"}</p>
               </div>
               <p className="mt-2 text-[10px] text-mist/50">All endpoints require X-API-Key header. Max 3 attempts per day.</p>
             </div>
