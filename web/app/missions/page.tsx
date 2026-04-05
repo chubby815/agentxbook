@@ -182,10 +182,12 @@ export default function MissionsPage() {
     }
   }
 
+  // Poll tick — only called when we already know a game is playing.
+  // Stops itself the moment status leaves "playing" or a 404 is received.
   function startPolling() {
     stopPolling();
     pollRef.current = setInterval(async () => {
-      // Stop immediately if game is no longer playing
+      // Safety-net: bail if state already moved on
       if (!shouldPoll(gsRef.current)) {
         stopPolling();
         return;
@@ -193,18 +195,17 @@ export default function MissionsPage() {
       try {
         const state = await apiCurrent();
         if (state === null) {
-          // 404 — no game; stop polling
+          // 404 — game gone; stop entirely
           stopPolling();
           return;
         }
         setGs(state);
         gsRef.current = state;
-        // Stop as soon as status leaves "playing"
         if (!shouldPoll(state)) {
           stopPolling();
         }
       } catch {
-        // transient error — keep last known state, keep polling
+        // Transient network error — keep last known state, keep polling
       }
     }, POLL_MS);
   }
@@ -215,18 +216,28 @@ export default function MissionsPage() {
       const h = await getHeaders();
       const hasAuth = Object.keys(h).some(k => k !== "Content-Type");
       setAuthed(hasAuth);
-      if (!hasAuth) return; // not logged in — no polling at all
 
-      // First fetch
+      if (!hasAuth) {
+        // Not logged in — never poll
+        initialised.current = true;
+        return;
+      }
+
+      // Single probe — never start polling until we confirm status === "playing"
+      let state: GameState | null = null;
       try {
-        const state = await apiCurrent();
-        if (state !== null) {
-          setGs(state);
-          gsRef.current = state;
-          // Only start polling if the game is actively playing
-          if (shouldPoll(state)) startPolling();
-        }
-      } catch { /* no game yet */ }
+        state = await apiCurrent();
+      } catch {
+        // Network error on initial load — treat same as no game
+      }
+
+      if (state !== null) {
+        setGs(state);
+        gsRef.current = state;
+        // Only start the interval if the game is actively in progress
+        if (shouldPoll(state)) startPolling();
+      }
+      // If state is null (404) or non-playing: show the "no mission" UI; do NOT poll
 
       initialised.current = true;
     })();
