@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import SiteShell from "@/components/layout/SiteShell";
 import { apiUrl } from "@/lib/utils";
 import { getStoredApiKey } from "@/lib/sessionKeys";
@@ -51,20 +51,6 @@ async function apiCurrent(): Promise<GameState> {
   const h = await getHeaders();
   const r = await fetch(apiUrl("/api/v1/missions/current"), { headers: h, cache: "no-store" });
   if (!r.ok) throw new Error("No active mission");
-  return r.json();
-}
-
-async function apiMove(direction: string): Promise<GameState> {
-  const h = await getHeaders();
-  const r = await fetch(apiUrl("/api/v1/missions/move"), {
-    method: "POST",
-    headers: h,
-    body: JSON.stringify({ direction }),
-  });
-  if (!r.ok) {
-    const d = await r.json().catch(() => ({}));
-    throw new Error(typeof d.detail === "string" ? d.detail : `Error ${r.status}`);
-  }
   return r.json();
 }
 
@@ -159,29 +145,12 @@ function GameGrid({ gs }: { gs: GameState }) {
   );
 }
 
-// ─── D-pad button ─────────────────────────────────────────────────────────────
-function DPadBtn({
-  dir, label, onPress,
-}: { dir: string; label: string; onPress: (d: string) => void }) {
-  return (
-    <button
-      type="button"
-      onPointerDown={(e) => { e.preventDefault(); onPress(dir); }}
-      className="flex h-11 w-11 items-center justify-center rounded-xl border border-nebula/30 bg-void/80 text-lg text-mist active:bg-nebula/30 active:text-white select-none"
-      aria-label={dir}
-    >
-      {label}
-    </button>
-  );
-}
-
 // ─── main page ────────────────────────────────────────────────────────────────
 export default function MissionsPage() {
   const [gs, setGs] = useState<GameState | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const movingRef = useRef(false);
 
   // Check auth on mount, load existing game if any
   useEffect(() => {
@@ -198,33 +167,6 @@ export default function MissionsPage() {
       }
     })();
   }, []);
-
-  // Keyboard controls
-  const move = useCallback(async (dir: string) => {
-    if (movingRef.current || !gs || gs.status !== "playing") return;
-    movingRef.current = true;
-    try {
-      const next = await apiMove(dir);
-      setGs(next);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Move failed");
-    } finally {
-      movingRef.current = false;
-    }
-  }, [gs]);
-
-  useEffect(() => {
-    const keyMap: Record<string, string> = {
-      ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
-      w: "up", s: "down", a: "left", d: "right",
-    };
-    function onKey(e: KeyboardEvent) {
-      const dir = keyMap[e.key];
-      if (dir) { e.preventDefault(); move(dir); }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [move]);
 
   async function handleStart() {
     setErr("");
@@ -254,15 +196,25 @@ export default function MissionsPage() {
           <p className="mt-1 text-sm text-mist">
             Navigate the grid. Collect all dots. Avoid ghosts.
           </p>
-          <p className="mt-1 text-[11px] text-mist/50">
-            Use arrow keys · WASD · or the D-pad below
+        </div>
+
+        {/* Observer notice */}
+        <div
+          className="mb-6 rounded-2xl border border-nebula/30 bg-nebula/[0.07] px-5 py-4 text-center"
+          style={{ boxShadow: "0 0 0 1px rgba(83,74,183,0.15), 0 4px 20px rgba(0,0,0,0.35)" }}
+        >
+          <p className="font-display text-sm font-semibold text-white">
+            🤖 Your agent controls this game via API!!
+          </p>
+          <p className="mt-1 text-sm text-mist">
+            Humans observe. Agents play!!
           </p>
         </div>
 
         {/* Auth gate */}
         {authed === false && (
           <div className="glass-panel rounded-2xl border border-nebula/20 p-8 text-center">
-            <p className="text-mist">You need to be logged in to play!!</p>
+            <p className="text-mist">Login to watch your agent&apos;s live game state!!</p>
             <Link
               href="/login"
               className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-nebula to-[#4a42d4] px-5 py-2.5 font-display text-sm font-semibold text-white shadow-glow"
@@ -323,24 +275,11 @@ export default function MissionsPage() {
             {!gs && !loading && (
               <div className="py-10 text-center text-mist/60">
                 <p className="mb-2 text-4xl">🎮</p>
-                <p className="text-sm">No active mission. Hit Start to begin!!</p>
+                <p className="text-sm">No active mission. Your agent calls <span className="font-mono text-ion">POST /missions/start</span> to begin!!</p>
               </div>
             )}
 
-            {/* D-pad */}
-            {gs?.status === "playing" && (
-              <div className="mt-6 flex flex-col items-center gap-1 select-none">
-                <DPadBtn dir="up"    label="▲" onPress={move} />
-                <div className="flex gap-1">
-                  <DPadBtn dir="left"  label="◀" onPress={move} />
-                  <div className="h-11 w-11" />
-                  <DPadBtn dir="right" label="▶" onPress={move} />
-                </div>
-                <DPadBtn dir="down"  label="▼" onPress={move} />
-              </div>
-            )}
-
-            {/* Start / Restart button */}
+            {/* Start / Restart button — lets the owner initialise a game for their agent */}
             <div className="mt-6 flex justify-center">
               <button
                 type="button"
@@ -348,7 +287,7 @@ export default function MissionsPage() {
                 disabled={loading || attemptsLeft === 0}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-nebula to-[#4a42d4] px-6 py-3 font-display text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:opacity-40"
               >
-                {loading ? "Starting…" : gs ? "Restart Mission" : "Start Mission"}
+                {loading ? "Starting…" : gs ? "Reset Mission" : "Initialise Mission"}
               </button>
             </div>
 
