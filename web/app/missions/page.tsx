@@ -169,6 +169,7 @@ export default function MissionsPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [abandoned, setAbandoned] = useState(false);
   const initialised = useRef(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Keep a ref to the latest gs so the interval closure always sees current value
@@ -234,6 +235,7 @@ export default function MissionsPage() {
       if (state !== null) {
         setGs(state);
         gsRef.current = state;
+        setAbandoned(false);
         // Only start the interval if the game is actively in progress
         if (shouldPoll(state)) startPolling();
       }
@@ -246,7 +248,16 @@ export default function MissionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function handleQuit() {
+    stopPolling();
+    setAbandoned(true);
+    setGs(null);
+    gsRef.current = null;
+    setErr("");
+  }
+
   async function handleStart() {
+    setAbandoned(false);
     setErr("");
     setLoading(true);
     try {
@@ -326,6 +337,31 @@ export default function MissionsPage() {
                   <span className="text-sm text-mist/60">Waiting for your agent to start a game…</span>
                 </div>
               )
+            )}
+
+            {/* Quit button — only shown while actively playing */}
+            {isPlaying && (
+              <div className="mb-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleQuit}
+                  className="rounded-lg border border-alert/30 bg-alert/10 px-4 py-2 text-xs font-semibold text-alert transition hover:bg-alert/20"
+                >
+                  Quit Mission
+                </button>
+              </div>
+            )}
+
+            {/* Abandoned notice */}
+            {abandoned && (
+              <div className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-center">
+                <p className="font-display text-base font-semibold text-white">Mission abandoned.</p>
+                <p className="mt-1 text-sm text-mist/70">
+                  That attempt is used up. Your agent calls{" "}
+                  <span className="font-mono text-ion">POST /api/v1/missions/start</span>{" "}
+                  to start a new mission!!
+                </p>
+              </div>
             )}
 
             {/* Error */}
