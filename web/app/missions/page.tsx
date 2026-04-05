@@ -24,6 +24,11 @@ type GameState = {
 
 const POLL_MS = 500;
 
+// Only poll when the game is actively playing
+function shouldPoll(state: GameState | null): boolean {
+  return state?.status === "playing";
+}
+
 // ─── auth ─────────────────────────────────────────────────────────────────────
 async function getHeaders(): Promise<Record<string, string>> {
   const key = typeof window !== "undefined" ? getStoredApiKey() : null;
@@ -164,20 +169,42 @@ export default function MissionsPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [authed, setAuthed] = useState<boolean | null>(null);
-  // Track whether this is the first load (before any poll has returned)
   const initialised = useRef(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Keep a ref to the latest gs so the interval closure always sees current value
+  const gsRef = useRef<GameState | null>(null);
+  gsRef.current = gs;
 
-  // ── polling loop ──────────────────────────────────────────────────────────
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
   function startPolling() {
-    if (pollRef.current) clearInterval(pollRef.current);
+    stopPolling();
     pollRef.current = setInterval(async () => {
+      // Stop immediately if game is no longer playing
+      if (!shouldPoll(gsRef.current)) {
+        stopPolling();
+        return;
+      }
       try {
         const state = await apiCurrent();
-        // state is null → 404, no game ever started; keep whatever we have
-        if (state !== null) setGs(state);
+        if (state === null) {
+          // 404 — no game; stop polling
+          stopPolling();
+          return;
+        }
+        setGs(state);
+        gsRef.current = state;
+        // Stop as soon as status leaves "playing"
+        if (!shouldPoll(state)) {
+          stopPolling();
+        }
       } catch {
-        // transient network error — keep last known state
+        // transient error — keep last known state, keep polling
       }
     }, POLL_MS);
   }
@@ -188,21 +215,23 @@ export default function MissionsPage() {
       const h = await getHeaders();
       const hasAuth = Object.keys(h).some(k => k !== "Content-Type");
       setAuthed(hasAuth);
-      if (!hasAuth) return;
+      if (!hasAuth) return; // not logged in — no polling at all
 
       // First fetch
       try {
         const state = await apiCurrent();
-        if (state !== null) setGs(state);
+        if (state !== null) {
+          setGs(state);
+          gsRef.current = state;
+          // Only start polling if the game is actively playing
+          if (shouldPoll(state)) startPolling();
+        }
       } catch { /* no game yet */ }
 
       initialised.current = true;
-      startPolling();
     })();
 
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+    return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -212,6 +241,8 @@ export default function MissionsPage() {
     try {
       const state = await apiStart();
       setGs(state);
+      gsRef.current = state;
+      if (shouldPoll(state)) startPolling();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to start");
     } finally {
@@ -247,10 +278,13 @@ export default function MissionsPage() {
         {/* Auth gate */}
         {authed === false && (
           <div className="glass-panel rounded-2xl border border-nebula/20 p-8 text-center">
-            <p className="text-mist">Login to watch your agent&apos;s live game state!!</p>
+            <p className="mb-1 font-display text-base font-semibold text-white">
+              Login to watch your agent play!!
+            </p>
+            <p className="text-sm text-mist/70">You need to be logged in to view the live game board.</p>
             <Link
               href="/login"
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-nebula to-[#4a42d4] px-5 py-2.5 font-display text-sm font-semibold text-white shadow-glow"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-nebula to-[#4a42d4] px-5 py-2.5 font-display text-sm font-semibold text-white shadow-glow"
             >
               Login
             </Link>
@@ -328,15 +362,22 @@ export default function MissionsPage() {
               </div>
             )}
 
-            {/* Empty state before any game */}
-            {!gs && !loading && (
-              <div className="py-10 text-center text-mist/60">
-                <p className="mb-2 text-4xl">🎮</p>
-                <p className="text-sm">
-                  No game found. Your agent calls{" "}
-                  <span className="font-mono text-ion">POST /missions/start</span> to begin!!
+            {/* No active mission */}
+            {!gs && !loading && initialised.current && (
+              <div className="py-10 text-center">
+                <p className="mb-3 text-4xl">🎮</p>
+                <p className="font-display text-base font-semibold text-white">
+                  Start a mission via API to watch your agent play live!!
                 </p>
-                <p className="mt-1 text-[11px] opacity-60">This page polls every 500 ms — it will update automatically.</p>
+                <p className="mt-2 text-sm text-mist/60">
+                  Your agent calls{" "}
+                  <span className="font-mono text-ion">POST /api/v1/missions/start</span>
+                  {" "}then{" "}
+                  <span className="font-mono text-ion">POST /api/v1/missions/move</span>
+                </p>
+                <p className="mt-1 text-[11px] text-mist/40">
+                  The page will automatically update once a game is active.
+                </p>
               </div>
             )}
 
