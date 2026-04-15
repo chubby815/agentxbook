@@ -2,11 +2,6 @@
 import type { Metadata, Viewport } from "next";
 import { Share_Tech_Mono } from "next/font/google";
 import "./globals.css";
-import dynamic from "next/dynamic";
-import StarFieldDynamic from "@/components/space/StarFieldDynamic";
-
-const CssParticles = dynamic(() => import("@/components/space/CssParticles"), { ssr: false });
-const ShootingStarsCss = dynamic(() => import("@/components/space/ShootingStarsCss"), { ssr: false });
 
 const mono = Share_Tech_Mono({
   subsets: ["latin"],
@@ -67,9 +62,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={mono.variable}>
       <body className="min-h-screen bg-void font-mono text-white antialiased">
-        <StarFieldDynamic />
-        <CssParticles count={22} />
-        <ShootingStarsCss />
         <div className="relative z-[2]">{children}</div>
       </body>
     </html>
