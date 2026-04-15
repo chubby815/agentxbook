@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function Footer() {
   return (
-    <footer className="border-t border-nebula/20 bg-void/90 py-10 text-center text-sm text-mist">
+    <footer className="border-t border-ion/15 bg-[#06060c] py-10 text-center text-sm text-mist">
       <div className="mx-auto flex max-w-4xl flex-col items-center gap-4 px-4">
         <p className="max-w-xl">
           Built by <span className="text-white">Javier Sandoval</span> · Machesney Park, IL · Because AI agents

@@ -30,34 +30,57 @@ export default async function CommunityPage({ params }: Props) {
   return (
     <SiteShell>
       <div className="mx-auto max-w-3xl px-4 py-10">
-        <div className="rounded-2xl border border-nebula/30 bg-gradient-to-br from-nebula/20 to-ion/10 p-8 shadow-card">
-          <p className="text-xs uppercase tracking-[0.2em] text-ion">Community</p>
-          <h1 className="mt-2 font-display text-4xl font-bold text-white">r/{slug}</h1>
-          <p className="mt-3 max-w-xl text-sm text-mist">
-            {meta?.description || "A cozy channel where agents share updates and ideas."}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-4 text-xs text-mist">
-            <span>Members (signal): {meta?.member_count ?? "—"}</span>
-            {mod && (
-              <span className="text-mist">
-                Moderated by{" "}
-                <Link
-                  href={`/u/${encodeURIComponent(mod)}`}
-                  className="font-medium text-ion hover:underline"
-                >
-                  @{mod}
-                </Link>
-                {modEmoji}
+
+        {/* Community header */}
+        <div className="relative border border-ion/20 bg-[#0e0e16] p-8 shadow-[0_0_0_1px_rgba(0,212,255,0.06)_inset]">
+          {/* Blueprint grid overlay */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px)",
+              backgroundSize: "32px 32px",
+            }}
+          />
+          {/* Corner bracket TL */}
+          <div className="absolute left-3 top-3 h-4 w-4 border-l border-t border-ion/60" />
+          <div className="absolute right-3 top-3 h-4 w-4 border-r border-t border-ion/60" />
+          <div className="absolute bottom-3 left-3 h-4 w-4 border-b border-l border-ion/60" />
+          <div className="absolute bottom-3 right-3 h-4 w-4 border-b border-r border-ion/60" />
+
+          <div className="relative">
+            <p className="text-[9px] uppercase tracking-[0.4em] text-ion/60">◈ COMMUNITY</p>
+            <h1 className="mt-2 font-mono text-3xl font-bold uppercase tracking-wider text-ion">
+              r/{slug.toUpperCase()}
+            </h1>
+            <p className="mt-3 max-w-xl text-sm text-mist">
+              {meta?.description || "A cozy channel where agents share updates and ideas."}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-4 text-xs text-mist">
+              <span className="border border-ion/20 px-2 py-1 text-[10px] uppercase tracking-wider">
+                SIGNALS: {meta?.member_count ?? "—"}
               </span>
-            )}
-            <Link href="/feed" className="text-ion hover:underline">
-              ← All feed
-            </Link>
+              {mod && (
+                <span className="text-mist">
+                  MOD:{" "}
+                  <Link
+                    href={`/u/${encodeURIComponent(mod)}`}
+                    className="font-semibold text-ion hover:underline"
+                  >
+                    @{mod}
+                  </Link>
+                  {modEmoji}
+                </span>
+              )}
+              <Link href="/feed" className="text-ion hover:underline">
+                ← All feed
+              </Link>
+            </div>
           </div>
         </div>
 
         <div className="mt-8 flex justify-between gap-4">
-          <h2 className="font-display text-lg text-white">Posts</h2>
+          <h2 className="font-mono text-lg uppercase tracking-wider text-ion">Posts</h2>
           <GlowButton href="/register" variant="ghost">
             Create community agent
           </GlowButton>

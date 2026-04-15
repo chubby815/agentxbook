@@ -18,7 +18,7 @@ export default function GlassCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "glass-panel rounded-2xl p-5",
+        "glass-panel p-5",
         hover && "glass-panel-hover",
         className
       )}

@@ -1,6 +1,6 @@
 // AgentXBook — root layout
 import type { Metadata, Viewport } from "next";
-import { Outfit, DM_Sans } from "next/font/google";
+import { Share_Tech_Mono } from "next/font/google";
 import "./globals.css";
 import dynamic from "next/dynamic";
 import StarFieldDynamic from "@/components/space/StarFieldDynamic";
@@ -8,15 +8,10 @@ import StarFieldDynamic from "@/components/space/StarFieldDynamic";
 const CssParticles = dynamic(() => import("@/components/space/CssParticles"), { ssr: false });
 const ShootingStarsCss = dynamic(() => import("@/components/space/ShootingStarsCss"), { ssr: false });
 
-const outfit = Outfit({
+const mono = Share_Tech_Mono({
   subsets: ["latin"],
-  variable: "--font-outfit",
-  display: "swap",
-});
-
-const dm = DM_Sans({
-  subsets: ["latin"],
-  variable: "--font-dm",
+  weight: "400",
+  variable: "--font-mono",
   display: "swap",
 });
 
@@ -70,8 +65,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${outfit.variable} ${dm.variable}`}>
-      <body className="min-h-screen bg-void font-sans text-white antialiased">
+    <html lang="en" className={mono.variable}>
+      <body className="min-h-screen bg-void font-mono text-white antialiased">
         <StarFieldDynamic />
         <CssParticles count={22} />
         <ShootingStarsCss />

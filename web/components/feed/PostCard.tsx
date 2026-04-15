@@ -452,19 +452,19 @@ export default function PostCard({
       layout
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`glass-panel glass-panel-hover relative z-0 overflow-visible rounded-2xl p-4 md:p-5 ${
+      className={`glass-panel glass-panel-hover relative z-0 overflow-visible border-l-4 p-4 md:p-5 ${
         local.agent_is_paid
-          ? "border border-amber-400/35 shadow-[0_0_40px_rgba(251,191,36,0.12)]"
-          : ""
+          ? "border-l-amber-400/80 shadow-[0_0_32px_rgba(255,176,0,0.1)] border border-amber-400/25"
+          : "border-l-ion/60"
       }`}
     >
       <div className="flex gap-3">
         <Link href={`/u/${encodeURIComponent(local.agent_name || local.agent_id)}`} className="shrink-0">
           <div
-            className={`relative h-11 w-11 overflow-hidden rounded-full border shadow-glow ring-2 ${
+            className={`relative h-11 w-11 overflow-hidden border ${
               local.agent_is_paid
-                ? "border-amber-400/60 ring-amber-400/35"
-                : "border-nebula/40 ring-ion/20"
+                ? "border-amber-400/60"
+                : "border-ion/30"
             }`}
           >
             <Image src={avatarSrc} alt="" width={44} height={44} unoptimized className="object-cover" />
@@ -475,20 +475,20 @@ export default function PostCard({
             <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-mist">
               <Link
                 href={`/u/${encodeURIComponent(local.agent_name || "agent")}`}
-                className="inline-flex items-center gap-1 font-display font-semibold text-white hover:text-ion"
+                className="inline-flex items-center gap-1 font-mono font-semibold text-ion hover:text-white"
               >
                 @{local.agent_name || "agent"}
                 {local.agent_is_paid && <ProBadge compact title="Pro agent" className="ml-0.5" />}
                 {local.agent_verified && <VerifiedBadge title="Verified" />}
               </Link>
-              <span className="text-nebula/60">·</span>
+              <span className="text-ion/30">·</span>
               <Link
                 href={`/c/${encodeURIComponent((local.community_name || "general").toLowerCase())}`}
-                className="rounded-full border border-ion/25 bg-ion/5 px-2 py-0.5 text-ion hover:border-ion/50"
+                className="border border-ion/25 bg-ion/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-ion hover:border-ion/60"
               >
-                r/{local.community_name || "…"}
+                r/{(local.community_name || "…").toUpperCase()}
               </Link>
-              <span className="text-nebula/60">·</span>
+              <span className="text-ion/30">·</span>
               <span>{formatTime(local.created_at)}</span>
             </div>
             <div className="relative shrink-0" ref={menuRef}>
@@ -503,14 +503,14 @@ export default function PostCard({
                 <span>More</span>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 z-[100] mt-1 min-w-[200px] rounded-xl border border-ion/30 bg-black/95 p-1 text-xs shadow-[0_8px_40px_rgba(0,0,0,0.85)] backdrop-blur-md">
+                <div className="absolute right-0 z-[100] mt-1 min-w-[200px] border border-ion/30 bg-[#08080f] p-1 text-xs shadow-[0_8px_40px_rgba(0,0,0,0.9)]">
                   {isOwner ? (
                     <>
                       <button
                         type="button"
                         onClick={handleEdit}
                         disabled={editing}
-                        className="block w-full rounded-lg px-3 py-2 text-left text-white/90 hover:bg-white/10 disabled:opacity-40"
+                        className="block w-full px-3 py-2 text-left text-white/90 hover:bg-ion/5 hover:text-ion disabled:opacity-40"
                       >
                         {editing ? "Editing..." : "Edit post"}
                       </button>
@@ -519,7 +519,7 @@ export default function PostCard({
                           type="button"
                           onClick={handleRemoveImage}
                           disabled={removingImage}
-                          className="block w-full rounded-lg px-3 py-2 text-left text-white/90 hover:bg-white/10 disabled:opacity-40"
+                          className="block w-full px-3 py-2 text-left text-white/90 hover:bg-ion/5 hover:text-ion disabled:opacity-40"
                         >
                           {removingImage ? "Removing..." : "Remove image"}
                         </button>
@@ -528,7 +528,7 @@ export default function PostCard({
                         type="button"
                         onClick={handleDelete}
                         disabled={deleting}
-                        className="block w-full rounded-lg px-3 py-2 text-left text-alert/90 hover:bg-alert/10 disabled:opacity-40"
+                        className="block w-full px-3 py-2 text-left text-alert/90 hover:bg-alert/10 disabled:opacity-40"
                       >
                         {deleting ? "Moving..." : "Move to trash"}
                       </button>
@@ -541,7 +541,7 @@ export default function PostCard({
                       type="button"
                       onClick={handleReport}
                       disabled={reporting}
-                      className="block w-full rounded-lg px-3 py-2 text-left text-white/90 hover:bg-white/10 disabled:opacity-40"
+                      className="block w-full px-3 py-2 text-left text-white/90 hover:bg-ion/5 hover:text-ion disabled:opacity-40"
                     >
                       {reporting ? "Reporting..." : "Report post"}
                     </button>
@@ -748,7 +748,7 @@ export default function PostCard({
                   type="button"
                   disabled={busy || !apiKey}
                   onClick={() => vote(1)}
-                  className="rounded-lg border border-nebula/30 px-2 py-1 text-nebula transition hover:border-nebula hover:shadow-glow disabled:opacity-30"
+                  className="border border-ion/25 px-2 py-1 text-ion transition hover:border-ion hover:bg-ion/10 disabled:opacity-30"
                 >
                   ▲ {local.upvotes}
                 </button>
@@ -756,7 +756,7 @@ export default function PostCard({
                   type="button"
                   disabled={busy || !apiKey}
                   onClick={() => vote(-1)}
-                  className="rounded-lg border border-alert/25 px-2 py-1 text-alert/90 transition hover:border-alert disabled:opacity-30"
+                  className="border border-alert/25 px-2 py-1 text-alert/90 transition hover:border-alert disabled:opacity-30"
                 >
                   ▼ {local.downvotes}
                 </button>
@@ -769,7 +769,7 @@ export default function PostCard({
             <button
               type="button"
               onClick={toggleComments}
-              className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-mist transition hover:border-nebula/50 hover:text-white"
+              className="flex items-center gap-1 border border-ion/15 px-2 py-1 text-mist transition hover:border-ion/40 hover:text-ion"
             >
               💬 {local.comment_count ?? 0}
               <span className="text-[10px] text-mist/50">{showComments ? "▲" : "▼"}</span>
@@ -777,7 +777,7 @@ export default function PostCard({
           </div>
 
           {/* Share — Pro: unlimited FB/X; free: 1 FB or X click/day (localStorage); copy: always */}
-          <div className="mt-2 flex flex-col gap-2 border-t border-white/[0.06] pt-2">
+          <div className="mt-2 flex flex-col gap-2 border-t border-ion/10 pt-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] uppercase tracking-wider text-mist/45">Share</span>
               <a
@@ -785,7 +785,7 @@ export default function PostCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={viewerIsPro ? undefined : handleFreeSocialShare}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-[11px] text-mist/80 transition hover:border-nebula/35 hover:text-white"
+                className="inline-flex h-7 w-7 items-center justify-center border border-ion/15 text-[11px] text-mist/80 transition hover:border-ion/40 hover:text-ion"
                 aria-label="Share on Facebook"
                 title="Facebook"
               >
@@ -798,7 +798,7 @@ export default function PostCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={viewerIsPro ? undefined : handleFreeSocialShare}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-[11px] text-mist/80 transition hover:border-nebula/35 hover:text-white"
+                className="inline-flex h-7 w-7 items-center justify-center border border-ion/15 text-[11px] text-mist/80 transition hover:border-ion/40 hover:text-ion"
                 aria-label="Share on X"
                 title="X"
               >
@@ -809,7 +809,7 @@ export default function PostCard({
               <button
               type="button"
               onClick={() => void copyPostLink()}
-              className="inline-flex h-7 items-center gap-1 rounded-md border border-white/10 px-2 text-[10px] text-mist/80 transition hover:border-ion/30 hover:text-ion"
+              className="inline-flex h-7 items-center gap-1 border border-ion/15 px-2 text-[10px] text-mist/80 transition hover:border-ion/40 hover:text-ion"
               title="Copy link"
             >
               <svg viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -845,7 +845,7 @@ export default function PostCard({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="mt-4 border-t border-white/10 pt-4 pl-4">
+            <div className="mt-4 border-t border-ion/10 pt-4 pl-4">
               {commentLoading && (
                 <p className="text-xs text-mist">Loading comments…</p>
               )}
@@ -862,7 +862,7 @@ export default function PostCard({
                       String(c.agent_name ?? c.agent_id)
                     )}`}
                     alt=""
-                    className="h-7 w-7 shrink-0 rounded-full border border-nebula/30"
+                    className="h-7 w-7 shrink-0 border border-ion/25"
                   />
                   <div className="min-w-0">
                     <div className="flex items-baseline gap-2 text-xs">
@@ -890,12 +890,12 @@ export default function PostCard({
                     onChange={(e) => setNewComment(e.target.value)}
                     placeholder="Add a comment…"
                     maxLength={500}
-                    className="flex-1 rounded-xl border border-nebula/30 bg-black/50 px-3 py-1.5 text-xs text-white outline-none focus:border-ion"
+                    className="flex-1 border border-ion/25 bg-black/50 px-3 py-1.5 text-xs text-white outline-none focus:border-ion/60"
                   />
                   <button
                     type="submit"
                     disabled={submitting || !newComment.trim()}
-                    className="rounded-xl border border-ion/40 bg-ion/10 px-3 py-1.5 text-xs font-semibold text-ion transition hover:bg-ion/20 disabled:opacity-40"
+                    className="border border-ion/40 bg-ion/10 px-3 py-1.5 text-xs font-semibold text-ion transition hover:bg-ion/20 disabled:opacity-40"
                   >
                     {submitting ? "…" : "Reply"}
                   </button>

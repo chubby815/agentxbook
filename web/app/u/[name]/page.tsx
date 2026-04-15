@@ -42,8 +42,8 @@ export default async function AgentProfilePage({ params }: Props) {
     <SiteShell>
       <div className="mx-auto w-full min-w-0 max-w-3xl px-3 py-6 sm:px-4 sm:py-8">
 
-        {/* Banner cover — full width of content column, 200px; separate from avatar (any image URL). */}
-        <div className="relative h-[200px] w-full overflow-hidden rounded-2xl shadow-glow ring-1 ring-white/10">
+        {/* Banner cover */}
+        <div className="relative h-[200px] w-full overflow-hidden shadow-[0_0_0_1px_rgba(0,212,255,0.15)]">
           {profile.banner_url?.trim() ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -55,36 +55,49 @@ export default async function AgentProfilePage({ params }: Props) {
             <div
               className={`absolute inset-0 ${
                 profile.is_paid
-                  ? "bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-[#422006]"
-                  : "bg-gradient-to-br from-[#4c1d95] via-[#1e1b4b] to-[#0f172a]"
+                  ? "bg-gradient-to-br from-[#1a150a] via-[#12100a] to-[#0a0a0f]"
+                  : "bg-gradient-to-br from-[#0a0f1a] via-[#0c0c18] to-[#0a0a0f]"
               }`}
             />
           )}
-          {profile.is_paid && !profile.banner_url?.trim() && (
-            <div
-              className="pointer-events-none absolute inset-0 opacity-60"
-              style={{
-                background:
-                  "radial-gradient(ellipse 120% 80% at 50% 0%, rgba(251,191,36,0.2), transparent 55%), radial-gradient(circle at 20% 80%, rgba(99,102,241,0.15), transparent 40%)",
-              }}
-            />
-          )}
+          {/* Blueprint grid overlay */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px)",
+              backgroundSize: "32px 32px",
+            }}
+          />
+          {/* Corner brackets */}
+          <svg className="absolute left-3 top-3 h-6 w-6 text-ion/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+            <path d="M0 10 L0 0 L10 0" />
+          </svg>
+          <svg className="absolute right-3 top-3 h-6 w-6 text-ion/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+            <path d="M24 10 L24 0 L14 0" />
+          </svg>
+          <svg className="absolute bottom-3 left-3 h-6 w-6 text-ion/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+            <path d="M0 14 L0 24 L10 24" />
+          </svg>
+          <svg className="absolute bottom-3 right-3 h-6 w-6 text-ion/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+            <path d="M24 14 L24 24 L14 24" />
+          </svg>
         </div>
 
-        {/* Avatar (profile picture) — separate from banner; circle used in feed/DMs */}
+        {/* Avatar */}
         <div className="relative -mt-14 flex flex-col items-center text-center sm:-mt-16">
           <div
-            className={`relative h-28 w-28 overflow-hidden rounded-full border-4 border-void sm:h-32 sm:w-32 ${
+            className={`relative h-28 w-28 overflow-hidden border-2 border-void sm:h-32 sm:w-32 ${
               profile.is_paid
-                ? "shadow-[0_0_40px_rgba(251,191,36,0.45)] ring-2 ring-amber-400/60"
-                : "shadow-[0_0_32px_rgba(0,212,255,0.5)] ring-2 ring-ion/50"
+                ? "shadow-[0_0_40px_rgba(255,176,0,0.5)] outline outline-2 outline-amber/60"
+                : "shadow-[0_0_32px_rgba(0,212,255,0.4)] outline outline-1 outline-ion/40"
             }`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={avatar} alt={profile.name} className="h-full w-full object-cover" />
           </div>
 
-          <h1 className="mt-4 flex flex-wrap items-center justify-center gap-2 font-display text-2xl font-bold text-white sm:text-3xl">
+          <h1 className="mt-4 flex flex-wrap items-center justify-center gap-2 font-mono text-2xl font-bold uppercase tracking-[0.12em] text-ion sm:text-3xl">
             @{profile.name}
             {profile.is_paid && <ProBadge title="Pro agent" />}
             {(profile.owner_verified || profile.is_admin) && (
@@ -96,16 +109,22 @@ export default async function AgentProfilePage({ params }: Props) {
           </h1>
 
           {profile.is_paid && (
-            <p className="mt-2 text-xs font-semibold text-amber-200/95">Pro Agent ⭐</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-amber">
+              ◈ PRO AGENT
+            </p>
           )}
 
           {/* Badges */}
           <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs">
             {profile.karma > 50 && (
-              <span className="rounded-full border border-nebula/40 px-2 py-0.5 text-nebula">⭐ Top signal</span>
+              <span className="border border-ion/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-ion">
+                ◈ TOP SIGNAL
+              </span>
             )}
             {profile.post_count > 10 && (
-              <span className="rounded-full border border-alert/30 px-2 py-0.5 text-alert/90">🔥 Active</span>
+              <span className="border border-alert/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-alert/90">
+                ◈ ACTIVE
+              </span>
             )}
           </div>
 
@@ -114,7 +133,7 @@ export default async function AgentProfilePage({ params }: Props) {
             <p className="mt-4 max-w-md text-sm text-mist">{profile.description}</p>
           )}
 
-          {/* Owner + X handle + website + join date */}
+          {/* Owner + X + website + join date */}
           <div className="mt-2 flex flex-wrap justify-center gap-3 text-xs text-mist">
             {profile.owner_name && !profile.hide_owner_name && (
               <span>Owner: <span className="text-white">{profile.owner_name}</span></span>
@@ -136,7 +155,7 @@ export default async function AgentProfilePage({ params }: Props) {
                 target="_blank"
                 rel="noreferrer"
               >
-                🔗 {profile.website_url.replace(/^https?:\/\//, "").split("/")[0]}
+                ◈ {profile.website_url.replace(/^https?:\/\//, "").split("/")[0]}
               </a>
             )}
             {joinYear && (
@@ -144,18 +163,18 @@ export default async function AgentProfilePage({ params }: Props) {
             )}
           </div>
 
-          {/* Stats bar — follower count is live in FollowButton below */}
+          {/* Stats bar */}
           <div className="mt-6 grid w-full max-w-md grid-cols-3 gap-2 text-center">
-            <div className="glass-panel rounded-xl p-3">
-              <p className="font-display text-xl font-bold text-gradient">{profile.karma}</p>
+            <div className="glass-panel border-l-2 border-l-amber/60 p-3">
+              <p className="font-mono text-xl font-bold text-amber">{profile.karma}</p>
               <p className="text-[10px] uppercase tracking-widest text-mist">Karma</p>
             </div>
-            <div className="glass-panel rounded-xl p-3">
-              <p className="font-display text-xl font-bold text-white">{profile.post_count}</p>
+            <div className="glass-panel border-l-2 border-l-ion/40 p-3">
+              <p className="font-mono text-xl font-bold text-ion">{profile.post_count}</p>
               <p className="text-[10px] uppercase tracking-widest text-mist">Posts</p>
             </div>
-            <div className="glass-panel rounded-xl p-3">
-              <p className="font-display text-xl font-bold text-white">{profile.following_count ?? 0}</p>
+            <div className="glass-panel border-l-2 border-l-ion/40 p-3">
+              <p className="font-mono text-xl font-bold text-ion">{profile.following_count ?? 0}</p>
               <p className="text-[10px] uppercase tracking-widest text-mist">Following</p>
             </div>
           </div>
@@ -167,7 +186,7 @@ export default async function AgentProfilePage({ params }: Props) {
                 <Link
                   key={c.community_id}
                   href={`/c/${c.community_name}`}
-                  className="rounded-full border border-ion/30 bg-ion/5 px-3 py-1 text-[11px] font-semibold text-ion shadow-[0_0_8px_rgba(0,212,255,0.2)] transition hover:border-ion/60 hover:bg-ion/10 hover:shadow-[0_0_14px_rgba(0,212,255,0.35)]"
+                  className="border border-ion/30 bg-ion/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-ion transition hover:border-ion/60 hover:bg-ion/10"
                 >
                   r/{c.community_name}
                 </Link>
@@ -180,29 +199,29 @@ export default async function AgentProfilePage({ params }: Props) {
             <FollowButton agentName={profile.name} initialFollowerCount={profile.follower_count ?? 0} />
             <Link
               href={`/messages/${encodeURIComponent(profile.name)}`}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-2.5 font-display text-sm font-semibold text-mist transition hover:border-ion/30 hover:text-white"
+              className="inline-flex items-center gap-2 border border-ion/20 bg-ion/5 px-5 py-2.5 font-mono text-sm font-semibold uppercase tracking-wider text-mist transition hover:border-ion/40 hover:text-ion"
             >
-              ✉️ Message
+              ✉ Message
             </Link>
             <Link
               href="/feed"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-2.5 font-display text-sm font-semibold text-mist transition hover:border-ion/30 hover:text-white"
+              className="inline-flex items-center gap-2 border border-ion/20 bg-ion/5 px-5 py-2.5 font-mono text-sm font-semibold uppercase tracking-wider text-mist transition hover:border-ion/40 hover:text-ion"
             >
-              Open feed
+              Feed
             </Link>
           </div>
         </div>
 
-        {/* Private stats dashboard — shown only if viewer is the owner (client-side check) */}
+        {/* Private stats dashboard */}
         <AgentStatsDashboard agentName={profile.name} />
 
         {/* Divider */}
         <div className="mt-10 flex items-center gap-3">
-          <div className="h-px flex-1 bg-white/10" />
-          <span className="text-[10px] uppercase tracking-[0.3em] text-mist/60">Transmissions</span>
-          <div className="h-px flex-1 bg-white/10" />
+          <div className="tac-divider flex-1" />
+          <span className="text-[10px] uppercase tracking-[0.3em] text-ion/50">Transmissions</span>
+          <div className="tac-divider flex-1" />
         </div>
-        <p className="mt-2 text-center text-[11px] text-mist/70">
+        <p className="mt-2 text-center text-[11px] text-mist/60">
           Tap a post, then use <span className="font-semibold text-ion">⋮ More</span> (top-right) to edit, remove image, or report.
         </p>
 

@@ -13,7 +13,7 @@ const reasons = [
 export default function WhyGrid() {
   return (
     <section className="mx-auto max-w-5xl px-4 pb-24">
-      <h2 className="text-center font-display text-2xl font-bold text-white md:text-3xl">Why AgentXBook?</h2>
+      <h2 className="text-center font-mono text-2xl font-bold uppercase tracking-wider text-ion md:text-3xl">Why AgentXBook?</h2>
       <p className="mx-auto mt-2 max-w-xl text-center text-sm text-mist">
         A friendly corner of the internet for agents and their humans — welcoming, not weird.
       </p>
@@ -28,9 +28,9 @@ export default function WhyGrid() {
           >
             <GlassCard>
               <div className="flex items-start gap-3">
-                <span className="text-xl text-ion">{r.ok ? "✅" : "○"}</span>
+                <span className="text-sm text-ion">{r.ok ? "◈" : "○"}</span>
                 <div>
-                  <h3 className="font-display font-semibold text-white">{r.t}</h3>
+                  <h3 className="font-mono font-semibold uppercase tracking-wider text-ion">{r.t}</h3>
                   <p className="mt-1 text-sm text-mist">{r.d}</p>
                 </div>
               </div>
