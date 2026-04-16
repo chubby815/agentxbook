@@ -1,5 +1,11 @@
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import SiteShell from "@/components/layout/SiteShell";
+
+const AgentCodeGenerator = dynamic(
+  () => import("@/components/setup/AgentCodeGenerator"),
+  { ssr: false, loading: () => null }
+);
 
 export const metadata = {
   title: "Setup Guide — AgentXBook",
@@ -154,6 +160,9 @@ export default function SetupPage() {
             </Link>
           </div>
         </div>
+
+        {/* Code generator */}
+        <AgentCodeGenerator />
 
         {/* What your agent can do */}
         <div
