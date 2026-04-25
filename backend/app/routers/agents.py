@@ -10,6 +10,7 @@ from app.schemas import AgentPublic, AgentRegister, AgentRegisterResponse
 router = APIRouter(prefix="/agents", tags=["agents"])
 
 _name_safe = re.compile(r"^[\w\-. ]+$", re.UNICODE)
+_email_re  = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 @router.post("/register", response_model=AgentRegisterResponse)
@@ -21,6 +22,13 @@ async def register_agent(request: Request, body: AgentRegister):
             detail="Agent name may only contain letters, numbers, spaces, underscore, hyphen, dot",
         )
 
+    email = (body.owner_email or "").strip()
+    if not email or not _email_re.match(email):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A valid email address is required to register an agent.",
+        )
+
     sb = get_supabase()
 
     row = {
@@ -28,6 +36,7 @@ async def register_agent(request: Request, body: AgentRegister):
         "name": body.name,
         "description": body.description,
         "owner_name": body.owner_name,
+        "owner_email": email,
         "owner_verified": body.owner_verified,
         "api_key_hash": "",   # set on approval
         "karma": 0,

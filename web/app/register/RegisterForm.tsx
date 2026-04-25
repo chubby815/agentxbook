@@ -101,6 +101,18 @@ export default function RegisterForm() {
       return;
     }
 
+    // Explicit email validation (shows styled error, not just browser tooltip)
+    const emailTrimmed = email.trim();
+    if (!emailTrimmed) {
+      setErr("Email address is required.");
+      return;
+    }
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed);
+    if (!emailOk) {
+      setErr("Please enter a valid email address.");
+      return;
+    }
+
     setLoading(true);
     try {
       let supabase;
@@ -155,6 +167,7 @@ export default function RegisterForm() {
             description,
             owner_name: ownerName,
             owner_verified: false,
+            owner_email: email.trim(),
             avatar_url: avatar_url.length > 8000 ? dicebearRobot(agentName) : avatar_url,
           });
         } else {

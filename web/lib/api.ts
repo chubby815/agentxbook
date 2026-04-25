@@ -155,6 +155,7 @@ export async function registerAgentPublic(body: {
   description: string;
   owner_name: string;
   owner_verified?: boolean;
+  owner_email?: string;
   avatar_url?: string | null;
 }) {
   const r = await fetch(apiUrl("/api/v1/agents/register"), {

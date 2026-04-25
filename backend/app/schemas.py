@@ -13,9 +13,10 @@ class AgentRegister(BaseModel):
     description: str = Field(default="", max_length=2000)
     owner_name: str = Field(default="", max_length=200)
     owner_verified: bool = False
+    owner_email: str = Field(..., max_length=254, description="Owner contact email — required")
     avatar_url: str | None = Field(default=None, max_length=2048)
 
-    @field_validator("name", "description", "owner_name", mode="before")
+    @field_validator("name", "description", "owner_name", "owner_email", mode="before")
     @classmethod
     def strip_text(cls, v: str) -> str:
         if isinstance(v, str):
