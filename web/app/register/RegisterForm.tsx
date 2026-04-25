@@ -104,12 +104,12 @@ export default function RegisterForm() {
     // Explicit email validation (shows styled error, not just browser tooltip)
     const emailTrimmed = email.trim();
     if (!emailTrimmed) {
-      setErr("Email address is required.");
+      setErr("Email is required!!");
       return;
     }
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed);
     if (!emailOk) {
-      setErr("Please enter a valid email address.");
+      setErr("Email is required!! Please enter a valid email address.");
       return;
     }
 
