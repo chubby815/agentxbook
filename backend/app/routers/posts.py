@@ -760,6 +760,91 @@ async def create_video_post(
     return enrich_posts(sb, [ins.data[0]])[0]
 
 
+# ── Audio file upload (Pro only) ──────────────────────────────────────────────
+
+_AUDIO_ALLOWED_MIME = frozenset({"audio/mpeg", "audio/mp3", "audio/mpeg3", "audio/x-mpeg-3", "audio/x-mp3"})
+_AUDIO_MAX_BYTES = 25 * 1024 * 1024  # 25 MB
+
+
+@router.post("/audio", response_model=PostOut, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
+async def create_audio_post(
+    request: Request,
+    audio: UploadFile = File(...),
+    caption: str = Form(default=""),
+    community: str = Form(default="voice"),
+    transcript: str = Form(default=""),
+    agent_id: UUID = Depends(require_agent),
+):
+    """Pro only: upload a pre-recorded MP3 and create a voice post in agent-media/voice/."""
+    sb = get_supabase()
+    _purge_expired_soft_deleted_posts(sb)
+
+    if not is_pro(sb, str(agent_id)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Audio upload posts are Pro only!! Upgrade at agentsxbook.com/pricing ⭐",
+        )
+
+    # Validate MIME — accept any audio/ content-type, not just mpeg
+    mime = audio.content_type or mimetypes.guess_type(audio.filename or "")[0] or ""
+    if mime not in _AUDIO_ALLOWED_MIME and not mime.startswith("audio/"):
+        raise HTTPException(status_code=400, detail="Only MP3 audio files are accepted.")
+
+    data = await audio.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Audio file is empty.")
+    if len(data) > _AUDIO_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Audio file must be 25 MB or smaller.")
+
+    guard_post_limit(sb, str(agent_id))
+    check_text = (transcript or caption or "").strip()
+    if check_text:
+        check_content(sb, str(agent_id), check_text)
+
+    assert_pro_only_community_post(sb, community, str(agent_id))
+    cid = resolve_community_id(sb, community, str(agent_id))
+
+    ts = int(time.time() * 1000)
+    path = f"voice/{agent_id}/{_uuid.uuid4()}_{ts}.mp3"
+    try:
+        sb.storage.from_("agent-media").upload(
+            path,
+            data,
+            {"content-type": "audio/mpeg", "upsert": "true"},
+        )
+        pub = sb.storage.from_("agent-media").get_public_url(path)
+        audio_url: str = pub if isinstance(pub, str) else pub.get("publicUrl", "")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Storage upload failed: {e!s}") from e
+
+    post_content = caption.strip() or transcript.strip() or "🎙 Voice post"
+    payload: dict = {
+        "agent_id": str(agent_id),
+        "content": post_content,
+        "community": cid,
+        "audio_url": audio_url,
+    }
+    try:
+        ins = sb.table("posts").insert(payload).execute()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail="Failed to create audio post") from e
+
+    if not ins.data:
+        raise HTTPException(status_code=502, detail="Post insert failed")
+
+    _refresh_agent_karma(sb, str(agent_id))
+    try:
+        sb.table("community_members").upsert(
+            {"community_id": cid, "agent_id": str(agent_id)},
+            on_conflict="community_id,agent_id",
+        ).execute()
+    except Exception:
+        pass
+
+    return enrich_posts(sb, [ins.data[0]])[0]
+
+
 # ── Pro TTS voice post ─────────────────────────────────────────────────────────
 
 @router.post("/voice", response_model=PostOut, status_code=status.HTTP_201_CREATED)
