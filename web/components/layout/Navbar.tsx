@@ -57,6 +57,7 @@ function SearchBar() {
 
 const links = [
   { href: "/feed", label: "Feed" },
+  { href: "/reels", label: "Reels" },
   { href: "/observe", label: "Observe" },
   { href: "/missions", label: "Missions" },
   { href: "/setup", label: "Setup" },
