@@ -41,6 +41,7 @@ export default function SettingsPanel() {
   const [hideOwner, setHideOwner] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
   const [bannerUrl, setBannerUrl] = useState("");
+  const [bannerUploading, setBannerUploading] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -206,6 +207,42 @@ export default function SettingsPanel() {
       }
     } catch { /* keep local preview */ }
     finally { setAvatarUploading(false); }
+  }
+
+  async function handleBannerFile(f: File | null) {
+    if (!f) return;
+    setErr("");
+    if (!f.type.startsWith("image/")) {
+      setErr("Banner must be an image (JPG/PNG/WebP/GIF).");
+      return;
+    }
+    if (f.size > 5 * 1024 * 1024) {
+      setErr("Banner must be 5 MB or smaller.");
+      return;
+    }
+    setBannerUploading(true);
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const sb = createClient();
+      const ext = (f.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const safeName = (agentName || "agent").replace(/[^\w\-]+/g, "_");
+      const path = `banners/${safeName}-${Date.now()}.${ext}`;
+      const { error } = await sb.storage.from("agent-media").upload(path, f, {
+        contentType: f.type,
+        upsert: true,
+      });
+      if (error) {
+        setErr(`Banner upload failed: ${error.message}`);
+        return;
+      }
+      const { data } = sb.storage.from("agent-media").getPublicUrl(path);
+      setBannerUrl(data.publicUrl);
+      setMsg("Banner uploaded — click Save changes to publish.");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Banner upload failed.");
+    } finally {
+      setBannerUploading(false);
+    }
   }
 
   async function changeAvatar() {
@@ -602,20 +639,47 @@ export default function SettingsPanel() {
           </div>
           <div>
             <label className="text-xs font-medium text-white">
-              Banner URL — <span className="font-normal text-mist">cover photo</span>
+              Banner — <span className="font-normal text-mist">cover photo</span>
             </label>
             <p className="mt-0.5 text-[10px] text-mist/60">
-              Wide image at the <strong className="text-mist">top</strong> of your profile (~200px tall), like a Facebook cover.
-              Saved as <code className="font-mono text-ion/90">banner_url</code>.
+              Full-width cover at the top of your profile (wide landscape, ~3:1). Paste a URL or upload to{" "}
+              <code className="font-mono text-ion/90">agent-media/banners/</code>.
             </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-nebula/40 bg-nebula/10 px-3 py-2 text-xs font-semibold text-ion transition hover:bg-nebula/20">
+                {bannerUploading ? "Uploading…" : "Upload image"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={bannerUploading || busy}
+                  onChange={(e) => {
+                    void handleBannerFile(e.target.files?.[0] || null);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {bannerUrl.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBannerUrl("");
+                    setMsg("Banner cleared — click Save changes to publish.");
+                  }}
+                  className="rounded-xl border border-alert/35 px-3 py-2 text-xs text-alert/90 hover:bg-alert/10"
+                >
+                  Clear banner
+                </button>
+              ) : null}
+            </div>
             <input
               value={bannerUrl}
               onChange={(e) => setBannerUrl(e.target.value)}
-              placeholder="https://… (wide landscape image)"
+              placeholder="Or paste image URL…"
               className="mt-2 w-full rounded-xl border border-nebula/30 bg-black/50 px-3 py-2 text-sm outline-none focus:border-ion"
             />
             {bannerUrl.trim() ? (
-              <div className="mt-2 h-20 w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-black/30">
+              <div className="mt-2 aspect-[3/1] w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-black/30">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={bannerUrl.trim()}
@@ -625,7 +689,7 @@ export default function SettingsPanel() {
               </div>
             ) : null}
             <p className="mt-1 text-[10px] text-mist/55">
-              Leave empty for the default space gradient on your public profile.
+              Leave empty for the default space gradient. Max 5 MB (JPG/PNG/WebP/GIF).
             </p>
           </div>
           <div>

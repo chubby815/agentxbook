@@ -40,52 +40,61 @@ export default async function AgentProfilePage({ params }: Props) {
 
   return (
     <SiteShell>
-      <div className="mx-auto w-full min-w-0 max-w-3xl px-3 py-6 sm:px-4 sm:py-8">
-
-        {/* Banner cover */}
-        <div className="relative h-[200px] w-full overflow-hidden shadow-[0_0_0_1px_rgba(0,212,255,0.15)]">
-          {profile.banner_url?.trim() ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={profile.banner_url.trim()}
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-          ) : (
-            <div
-              className={`absolute inset-0 ${
-                profile.is_paid
-                  ? "bg-gradient-to-br from-[#1a150a] via-[#12100a] to-[#0a0a0f]"
-                  : "bg-gradient-to-br from-[#0a0f1a] via-[#0c0c18] to-[#0a0a0f]"
-              }`}
-            />
-          )}
-          {/* Blueprint grid overlay */}
+      <div className="mx-auto w-full min-w-0 max-w-3xl px-0 pb-6 pt-0 sm:pb-8 sm:pt-2">
+        {/* Full-bleed banner (Twitter/X-style cover) */}
+        <div className="relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2">
           <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              backgroundImage:
-                "linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px)",
-              backgroundSize: "32px 32px",
-            }}
-          />
-          {/* Corner brackets */}
-          <svg className="absolute left-3 top-3 h-6 w-6 text-ion/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-            <path d="M0 10 L0 0 L10 0" />
-          </svg>
-          <svg className="absolute right-3 top-3 h-6 w-6 text-ion/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-            <path d="M24 10 L24 0 L14 0" />
-          </svg>
-          <svg className="absolute bottom-3 left-3 h-6 w-6 text-ion/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-            <path d="M0 14 L0 24 L10 24" />
-          </svg>
-          <svg className="absolute bottom-3 right-3 h-6 w-6 text-ion/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-            <path d="M24 14 L24 24 L14 24" />
-          </svg>
+            className={`relative w-full overflow-hidden ${
+              profile.banner_url?.trim()
+                ? "h-[140px] sm:h-[200px] md:h-[260px]"
+                : "h-[140px] sm:h-[180px] md:h-[200px]"
+            }`}
+          >
+            {profile.banner_url?.trim() ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profile.banner_url.trim()}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : (
+              <div
+                className={`absolute inset-0 ${
+                  profile.is_paid
+                    ? "bg-gradient-to-br from-[#1a150a] via-[#12100a] to-[#0a0a0f]"
+                    : "bg-gradient-to-br from-[#0a0f1a] via-[#0c0c18] to-[#0a0a0f]"
+                }`}
+              />
+            )}
+            {!profile.banner_url?.trim() && (
+              <>
+                <div
+                  className="pointer-events-none absolute inset-0"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px)",
+                    backgroundSize: "32px 32px",
+                  }}
+                />
+                <svg className="absolute left-3 top-3 h-6 w-6 text-ion/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                  <path d="M0 10 L0 0 L10 0" />
+                </svg>
+                <svg className="absolute right-3 top-3 h-6 w-6 text-ion/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                  <path d="M24 10 L24 0 L14 0" />
+                </svg>
+                <svg className="absolute bottom-3 left-3 h-6 w-6 text-ion/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                  <path d="M0 14 L0 24 L10 24" />
+                </svg>
+                <svg className="absolute bottom-3 right-3 h-6 w-6 text-ion/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                  <path d="M24 14 L24 24 L14 24" />
+                </svg>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Avatar */}
-        <div className="relative -mt-14 flex flex-col items-center text-center sm:-mt-16">
+        {/* Avatar + profile body (padded column) */}
+        <div className="relative -mt-14 flex flex-col items-center px-3 text-center sm:-mt-16 sm:px-4">
           <div
             className={`relative h-28 w-28 overflow-hidden border-2 border-void sm:h-32 sm:w-32 ${
               profile.is_paid
@@ -210,7 +219,6 @@ export default async function AgentProfilePage({ params }: Props) {
               Feed
             </Link>
           </div>
-        </div>
 
         {/* Private stats dashboard */}
         <AgentStatsDashboard agentName={profile.name} />
@@ -228,6 +236,7 @@ export default async function AgentProfilePage({ params }: Props) {
         {/* Instagram-style grid */}
         <ProfileGrid posts={posts} />
 
+        </div>
       </div>
     </SiteShell>
   );
