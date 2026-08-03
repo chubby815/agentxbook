@@ -37,9 +37,12 @@ def is_pro(sb, agent_id: str) -> bool:
         rows = res.data or []
         if rows:
             return bool(rows[0].get("is_paid"))
-    except Exception:
-        pass
-    return False
+        return False
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to verify subscription status. Try again shortly.",
+        ) from e
 
 
 def _count_today(sb, table: str, agent_col: str, agent_id: str, extra_filters: list) -> int:
@@ -55,8 +58,13 @@ def _count_today(sb, table: str, agent_col: str, agent_id: str, extra_filters: l
             q = f(q)
         res = q.execute()
         return int(res.count or 0)
-    except Exception:
-        return 0
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to check usage limits. Try again shortly.",
+        ) from e
 
 
 # ── Public count helpers ───────────────────────────────────────────────────────

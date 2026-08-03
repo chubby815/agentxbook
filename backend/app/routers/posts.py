@@ -90,7 +90,7 @@ def _refresh_agent_karma(sb, agent_id: str) -> None:
 
 @router.post("", response_model=PostOut)
 @limiter.limit("300/minute")
-async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depends(require_agent)):
+async def create_post(request: Request, body: PostCreate, agent_id: UUID = Depends(require_agent_any)):
     sb = get_supabase()
     _purge_expired_soft_deleted_posts(sb)
     assert_pro_only_community_post(sb, body.community, str(agent_id))
@@ -281,7 +281,7 @@ async def vote_post(
     request: Request,
     post_id: UUID,
     body: VoteBody,
-    agent_id: UUID = Depends(require_agent),
+    agent_id: UUID = Depends(require_agent_any),
 ):
     """Apply vote; request body is VoteBody (direction 1|-1, or common aliases — see app.schemas.VoteBody)."""
     sb = get_supabase()
@@ -572,7 +572,7 @@ async def create_image_post(
     image: UploadFile = File(...),
     caption: str = Form(default=""),
     community: str = Form(...),
-    agent_id: UUID = Depends(require_agent),
+    agent_id: UUID = Depends(require_agent_any),
 ):
     """Upload an image and create a post in one call (multipart/form-data)."""
     # Validate mime type
@@ -662,7 +662,7 @@ async def add_comment(
     request: Request,
     post_id: UUID,
     body: CommentCreate,
-    agent_id: UUID = Depends(require_agent),
+    agent_id: UUID = Depends(require_agent_any),
 ):
     sb = get_supabase()
     _purge_expired_soft_deleted_posts(sb)

@@ -1,0 +1,43 @@
+AGENTXBOOK — MASTER CONTEXT
+
+Frontend: Next.js 14 at C:\Agentxbook\web (Vercel)
+Backend: FastAPI at C:\Agentxbook\backend (Railway)
+Database: Supabase PostgreSQL (project mbzkfjpvbrbdhutvovam)
+Payments: Stripe LIVE mode, $4.99/month Pro
+
+Live URLs:
+- agentsxbook.com (frontend)
+- agentxbook-backend-production.up.railway.app (backend — note: no "s" after "agent")
+- agentsxbook.com/admin (admin panel)
+
+PROD IS THE SOURCE OF TRUTH, NOT MIGRATIONS.
+supabase/migrations/ is stale and does not reflect production. Verified
+2026-08-02 against the live database:
+- RLS is ENABLED on all 15 public tables with correct scoped policies.
+  Do not "fix" RLS based on migration files.
+- user_agent_follows is the live follow table. follows is vestigial (1 row).
+  Code referencing user_agent_follows is correct.
+- image_url exists on posts in prod but is absent from migrations.
+- Only follows and post_votes have RLS on with no policies. Both are correct:
+  post_votes writes go through the apply_post_vote RPC as service role.
+Never infer schema, RLS, or column existence from migration files. Query the
+live database or ask Javier.
+
+NEVER TOUCH:
+- web/components/feed/FeedExperience.tsx
+- web/lib/utils.ts apiUrl()
+- backend/app/db.py
+- backend/app/security.py
+- backend/app/deps.py
+- web/lib/supabase/client.ts
+- web/lib/supabase/server.ts
+- backend/app/main.py CORS section
+- backend/railway.toml
+- Agent folders (Bailey-2.0, sniper, etc)
+
+RULES:
+- Never guess — check errors first.
+- One fix at a time.
+- npm run build must pass.
+- Zero TypeScript errors.
+- Never push without Javier saying push.

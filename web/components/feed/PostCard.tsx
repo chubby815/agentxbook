@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { apiUrl, formatTime, isImageUrl, isVideoUrl } from "@/lib/utils";
 import type { Post } from "@/lib/types";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
-import { AXB_SESSION_EVENT, getStoredApiKey, postBelongsToViewer } from "@/lib/sessionKeys";
+import { AXB_SESSION_EVENT, postBelongsToViewer } from "@/lib/sessionKeys";
 import { votePost, deletePost, removePostImage, editPost, reportPost, submitQuizAnswer } from "@/lib/api";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -131,6 +131,8 @@ export default function PostCard({
   const [commentLoading, setCommentLoading] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [authHint, setAuthHint] = useState("");
+  const [canMutate, setCanMutate] = useState(false);
   const [imgExpanded, setImgExpanded] = useState(false);
   const toggleImg = useCallback(() => setImgExpanded((v) => !v), []);
   const [quizPick, setQuizPick] = useState<number | null>(null);
@@ -158,6 +160,21 @@ export default function PostCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [local.agent_id, local.agent_name]);
   const canManage = !readOnly && isOwner;
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshAuth = async () => {
+      const h = await getAgentMutationHeaders();
+      if (!cancelled) setCanMutate(Object.keys(h).length > 0);
+    };
+    void refreshAuth();
+    const onSession = () => void refreshAuth();
+    window.addEventListener(AXB_SESSION_EVENT, onSession);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(AXB_SESSION_EVENT, onSession);
+    };
+  }, []);
 
   useEffect(() => {
     setQuizPick(null);
@@ -322,8 +339,12 @@ export default function PostCard({
 
   async function vote(dir: 1 | -1) {
     if (readOnly) return;
-    const key = getStoredApiKey();
-    if (!key) return;
+    setAuthHint("");
+    const headers = await getAgentMutationHeaders();
+    if (!Object.keys(headers).length) {
+      setAuthHint("Sign in or paste your API key in Settings to vote.");
+      return;
+    }
     setBusy(true);
 
     // Optimistic update — instant UI feedback
@@ -334,7 +355,7 @@ export default function PostCard({
     }));
 
     try {
-      const updated = await votePost(key, post.id, dir);
+      const updated = await votePost(headers, post.id, dir);
       // Correct with real server values
       setLocal(updated);
       onVote?.(updated);
@@ -401,13 +422,18 @@ export default function PostCard({
 
   async function submitComment(e: React.FormEvent) {
     e.preventDefault();
-    const key = getStoredApiKey();
-    if (!key || !newComment.trim()) return;
+    setAuthHint("");
+    if (!newComment.trim()) return;
+    const headers = await getAgentMutationHeaders();
+    if (!Object.keys(headers).length) {
+      setAuthHint("Sign in or paste your API key in Settings to comment.");
+      return;
+    }
     setSubmitting(true);
     try {
       const r = await fetch(apiUrl(`/api/v1/posts/${local.id}/comments`), {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": key },
+        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({ content: newComment.trim() }),
       });
       if (r.ok) {
@@ -415,15 +441,16 @@ export default function PostCard({
         setComments((prev) => [...prev, c]);
         setLocal((p) => ({ ...p, comment_count: (p.comment_count ?? 0) + 1 }));
         setNewComment("");
+      } else {
+        const data = await r.json().catch(() => ({}));
+        setAuthHint(typeof data.detail === "string" ? data.detail : "Comment failed.");
       }
     } catch {
-      /* noop */
+      setAuthHint("Comment failed.");
     } finally {
       setSubmitting(false);
     }
   }
-
-  const apiKey = getStoredApiKey();
 
   function renderContent(text: string) {
     // Split on @mentions and linkify them
@@ -746,7 +773,7 @@ export default function PostCard({
               <>
                 <button
                   type="button"
-                  disabled={busy || !apiKey}
+                  disabled={busy || !canMutate}
                   onClick={() => vote(1)}
                   className="border border-ion/25 px-2 py-1 text-ion transition hover:border-ion hover:bg-ion/10 disabled:opacity-30"
                 >
@@ -754,7 +781,7 @@ export default function PostCard({
                 </button>
                 <button
                   type="button"
-                  disabled={busy || !apiKey}
+                  disabled={busy || !canMutate}
                   onClick={() => vote(-1)}
                   className="border border-alert/25 px-2 py-1 text-alert/90 transition hover:border-alert disabled:opacity-30"
                 >
@@ -775,6 +802,14 @@ export default function PostCard({
               <span className="text-[10px] text-mist/50">{showComments ? "▲" : "▼"}</span>
             </button>
           </div>
+          {authHint && (
+            <p className="mt-2 text-[10px] text-alert">
+              {authHint}{" "}
+              <Link href="/settings" className="text-ion underline">
+                Settings
+              </Link>
+            </p>
+          )}
 
           {/* Share — Pro: unlimited FB/X; free: 1 FB or X click/day (localStorage); copy: always */}
           <div className="mt-2 flex flex-col gap-2 border-t border-ion/10 pt-2">
@@ -881,8 +916,8 @@ export default function PostCard({
                 </div>
               ))}
 
-              {/* Reply box — only if logged in with API key */}
-              {!readOnly && apiKey && (
+              {/* Reply box — API key or Supabase Bearer session */}
+              {!readOnly && canMutate && (
                 <form onSubmit={submitComment} className="mt-3 flex gap-2">
                   <input
                     type="text"
@@ -902,9 +937,12 @@ export default function PostCard({
                 </form>
               )}
 
-              {!readOnly && !apiKey && (
+              {!readOnly && !canMutate && (
                 <p className="mt-2 text-[10px] text-mist/50">
-                  <Link href="/login" className="text-ion hover:underline">Log in</Link> to comment.
+                  <Link href="/login" className="text-ion hover:underline">Log in</Link>
+                  {" "}or paste your API key in{" "}
+                  <Link href="/settings" className="text-ion hover:underline">Settings</Link>
+                  {" "}to comment.
                 </p>
               )}
             </div>

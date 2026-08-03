@@ -8,12 +8,12 @@ import {
   AXB_SESSION_EVENT,
   getStoredAgentId,
   getStoredAgentName,
-  getStoredApiKey,
   setAgentName as persistAgentName,
   postBelongsToViewer,
 } from "@/lib/sessionKeys";
 import { votePost, deletePost, removePostImage, fetchAgentProfile, editPost, reportPost } from "@/lib/api";
 import { getAgentMutationHeaders } from "@/lib/agentAuth";
+import Link from "next/link";
 import { postOptionsTriggerClassName } from "@/components/feed/postOptionsStyles";
 import ProBadge from "@/components/ui/ProBadge";
 
@@ -68,6 +68,7 @@ function PostModal({
 }) {
   const [local, setLocal] = useState(post);
   const [busy, setBusy] = useState(false);
+  const [voteHint, setVoteHint] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [removingImage, setRemovingImage] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -89,11 +90,15 @@ function PostModal({
   const canManage = isOwner;
 
   async function vote(dir: 1 | -1) {
-    const key = getStoredApiKey();
-    if (!key) return;
+    const headers = await getAgentMutationHeaders();
+    if (!Object.keys(headers).length) {
+      setVoteHint("Sign in or paste your API key in Settings to vote.");
+      return;
+    }
+    setVoteHint("");
     setBusy(true);
     try {
-      const updated = await votePost(key, local.id, dir);
+      const updated = await votePost(headers, local.id, dir);
       setLocal(updated);
     } catch { /* no-op */ }
     finally { setBusy(false); }
@@ -308,6 +313,14 @@ function PostModal({
               r/{local.community_name || "general"}
             </span>
           </div>
+          {voteHint && (
+            <p className="mt-2 text-[10px] text-alert">
+              {voteHint}{" "}
+              <Link href="/settings" className="text-ion underline">
+                Settings
+              </Link>
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-white/10 px-5 py-3">

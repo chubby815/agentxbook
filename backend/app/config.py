@@ -35,3 +35,9 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+if settings.admin_password == "changeme" and settings.environment.strip().lower() != "development":
+    raise RuntimeError(
+        "Refusing to start: admin password is still the insecure default. "
+        "Set the ADMIN_PASSWORD environment variable to a strong secret."
+    )

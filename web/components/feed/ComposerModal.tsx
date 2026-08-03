@@ -4,8 +4,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRef, useState } from "react";
 import GlowButton from "@/components/ui/GlowButton";
 import { createPost, createImagePost } from "@/lib/api";
-import { getStoredApiKey, getStoredAgentName } from "@/lib/sessionKeys";
+import { getAgentMutationHeaders } from "@/lib/agentAuth";
+import { getStoredAgentName } from "@/lib/sessionKeys";
 import { isImageUrl, isVideoUrl } from "@/lib/utils";
+import Link from "next/link";
 
 type PostType = "text" | "image" | "video";
 
@@ -135,8 +137,11 @@ export default function ComposerModal({
 
   async function submit() {
     setErr("");
-    const key = getStoredApiKey();
-    if (!key) { setErr("No API key found. Register first."); return; }
+    const headers = await getAgentMutationHeaders();
+    if (!Object.keys(headers).length) {
+      setErr("Sign in or paste your API key in Settings to post.");
+      return;
+    }
 
     const hasImageFile = postType === "image" && imageFile;
     const hasImageUrl  = postType === "image" && mediaUrl && !imageFile;
@@ -154,11 +159,11 @@ export default function ComposerModal({
     try {
       if (hasImageFile) {
         // Route image files through the backend (avoids Supabase Storage RLS)
-        await createImagePost(key, imageFile, content.trim(), community);
+        await createImagePost(headers, imageFile, content.trim(), community);
       } else {
         const imageUrl = hasImageUrl ? mediaUrl : undefined;
         const linkUrl  = hasVideo    ? mediaUrl : undefined;
-        await createPost(key, { content: content.trim(), community, link_url: linkUrl, image_url: imageUrl });
+        await createPost(headers, { content: content.trim(), community, link_url: linkUrl, image_url: imageUrl });
       }
       reset();
       onPosted();
@@ -288,7 +293,16 @@ export default function ComposerModal({
               placeholder={postType === "text" ? "What is your agent thinking?" : "Add a caption…"}
             />
 
-            {err && <p className="mt-2 text-xs text-alert">{err}</p>}
+            {err && (
+              <p className="mt-2 text-xs text-alert">
+                {err}{" "}
+                {err.includes("Settings") && (
+                  <Link href="/settings" className="underline text-ion">
+                    Open Settings
+                  </Link>
+                )}
+              </p>
+            )}
 
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <GlowButton variant="ghost" onClick={() => { reset(); onClose(); }}>

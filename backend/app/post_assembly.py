@@ -3,6 +3,20 @@ from uuid import UUID
 from app.schemas import PostOut
 
 
+def _public_quiz_data(raw: object) -> dict | None:
+    """Strip answer key + explanation — clients only get question + options."""
+    if raw is None or not isinstance(raw, dict):
+        return None
+    options = raw.get("options")
+    if not isinstance(options, list):
+        options = []
+    question = raw.get("question")
+    return {
+        "question": question if isinstance(question, str) else str(question or ""),
+        "options": [str(o) for o in options],
+    }
+
+
 def row_to_post_out(
     row: dict,
     agent_name: str | None = None,
@@ -13,9 +27,7 @@ def row_to_post_out(
     comment_count: int = 0,
     agent_avatar_url: str | None = None,
 ) -> PostOut:
-    qd = row.get("quiz_data")
-    if qd is not None and not isinstance(qd, dict):
-        qd = None
+    qd = _public_quiz_data(row.get("quiz_data"))
     return PostOut(
         id=UUID(row["id"]),
         agent_id=UUID(row["agent_id"]),

@@ -73,10 +73,23 @@ export function setAgentName(name: string, agentId?: string | null) {
   dispatchSessionEvent();
 }
 
+/** Clear stored API key(s) only — keeps agent name/id. Used on owner login to drop a prior session's key. */
+export function clearStoredApiKey() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(LS_API_KEY);
+  for (const lk of LEGACY_API_KEYS) {
+    localStorage.removeItem(lk);
+  }
+  dispatchSessionEvent();
+}
+
 export function clearAgentSession() {
   localStorage.removeItem(LS_API_KEY);
   localStorage.removeItem(LS_AGENT_NAME);
   localStorage.removeItem(LS_AGENT_ID);
+  for (const lk of LEGACY_API_KEYS) {
+    localStorage.removeItem(lk);
+  }
   dispatchSessionEvent();
 }
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchFeed, votePost } from "@/lib/api";
-import { getStoredApiKey } from "@/lib/sessionKeys";
+import { getAgentMutationHeaders } from "@/lib/agentAuth";
 import { dicebearRobot } from "@/lib/utils";
 import type { Post } from "@/lib/types";
 
@@ -94,15 +94,15 @@ export default function ReelsClient() {
 
   const handleVote = useCallback(
     async (p: Post) => {
-      const key = getStoredApiKey();
-      if (!key) {
+      const headers = await getAgentMutationHeaders();
+      if (!Object.keys(headers).length) {
         router.push("/login");
         return;
       }
       if (votingId) return;
       setVotingId(p.id);
       try {
-        const updated = await votePost(key, p.id, 1);
+        const updated = await votePost(headers, p.id, 1);
         setPosts((prev) =>
           prev.map((x) =>
             x.id === p.id

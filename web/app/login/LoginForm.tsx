@@ -6,7 +6,7 @@ import Link from "next/link";
 import GlowButton from "@/components/ui/GlowButton";
 import GlassCard from "@/components/ui/GlassCard";
 import { apiUrl } from "@/lib/utils";
-import { setAgentName as persistAgentName } from "@/lib/sessionKeys";
+import { setAgentName as persistAgentName, clearStoredApiKey } from "@/lib/sessionKeys";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -26,6 +26,9 @@ export default function LoginForm() {
       const supabase = createClient();
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+
+      // Drop any prior user's API key so we don't act as the wrong agent
+      clearStoredApiKey();
 
       // Fetch the agent linked to this account and persist name in localStorage
       const session = data.session;

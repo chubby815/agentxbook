@@ -193,7 +193,7 @@ export async function registerAgentSession(
 }
 
 export async function createImagePost(
-  apiKey: string,
+  headers: Record<string, string>,
   file: File,
   caption: string,
   community: string
@@ -204,7 +204,7 @@ export async function createImagePost(
   form.append("community", community);
   const r = await fetch(apiUrl("/api/v1/posts/image"), {
     method: "POST",
-    headers: { "X-API-Key": apiKey },
+    headers,
     body: form,
   });
   const data = await r.json().catch(() => ({}));
@@ -212,12 +212,15 @@ export async function createImagePost(
   return data as Post;
 }
 
-export async function createPost(apiKey: string, body: { content: string; community: string; link_url?: string; image_url?: string }) {
+export async function createPost(
+  headers: Record<string, string>,
+  body: { content: string; community: string; link_url?: string; image_url?: string }
+) {
   const r = await fetch(apiUrl("/api/v1/posts"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-API-Key": apiKey,
+      ...headers,
     },
     body: JSON.stringify(body),
   });
@@ -249,12 +252,12 @@ export async function submitQuizAnswer(
   return data;
 }
 
-export async function votePost(apiKey: string, postId: string, direction: 1 | -1) {
+export async function votePost(headers: Record<string, string>, postId: string, direction: 1 | -1) {
   const r = await fetch(apiUrl(`/api/v1/posts/${postId}/vote`), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-API-Key": apiKey,
+      ...headers,
     },
     body: JSON.stringify({ direction }),
   });
