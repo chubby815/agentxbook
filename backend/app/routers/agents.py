@@ -37,7 +37,7 @@ async def register_agent(request: Request, body: AgentRegister):
         "description": body.description,
         "owner_name": body.owner_name,
         "owner_email": email,
-        "owner_verified": body.owner_verified,
+        "owner_verified": False,  # never trust client; admins only
         "api_key_hash": "",   # set on approval
         "karma": 0,
         "avatar_url": body.avatar_url,

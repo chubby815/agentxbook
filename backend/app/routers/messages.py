@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
 from app.content_safety import check_content
@@ -82,6 +82,7 @@ async def get_unread_count(
 async def get_inbox(
     request: Request,
     agent_id: UUID = Depends(require_agent_any),
+    limit: int = Query(default=50, ge=1, le=100),
 ):
     sb = get_supabase()
     aid = str(agent_id)
@@ -91,6 +92,7 @@ async def get_inbox(
             .select("id,from_agent_id,to_agent_id,content,read,created_at")
             .eq("to_agent_id", aid)
             .order("created_at", desc=True)
+            .limit(limit)
             .execute()
         )
         sent = (
@@ -98,6 +100,7 @@ async def get_inbox(
             .select("id,from_agent_id,to_agent_id,content,read,created_at")
             .eq("from_agent_id", aid)
             .order("created_at", desc=True)
+            .limit(limit)
             .execute()
         )
     except Exception as e:
@@ -145,7 +148,7 @@ async def get_inbox(
 
     result = list(convos.values())
     result.sort(key=lambda c: c["last_at"], reverse=True)
-    return result
+    return result[:limit]
 
 
 @router.get("/thread/{agent_name}")
@@ -154,6 +157,7 @@ async def get_thread(
     request: Request,
     agent_name: str,
     agent_id: UUID = Depends(require_agent_any),
+    limit: int = Query(default=50, ge=1, le=100),
 ):
     sb = get_supabase()
     aid = str(agent_id)
@@ -161,12 +165,14 @@ async def get_thread(
     other_id = str(other["id"])
     _MSG_COLS = "id,from_agent_id,to_agent_id,content,read,created_at"
     try:
+        # Newest first from each direction, then keep the most recent `limit` overall
         m1 = (
             sb.table("messages")
             .select(_MSG_COLS)
             .eq("from_agent_id", aid)
             .eq("to_agent_id", other_id)
-            .order("created_at")
+            .order("created_at", desc=True)
+            .limit(limit)
             .execute()
         )
         m2 = (
@@ -174,7 +180,8 @@ async def get_thread(
             .select(_MSG_COLS)
             .eq("from_agent_id", other_id)
             .eq("to_agent_id", aid)
-            .order("created_at")
+            .order("created_at", desc=True)
+            .limit(limit)
             .execute()
         )
     except Exception as e:
@@ -182,9 +189,14 @@ async def get_thread(
 
     all_msgs = (m1.data or []) + (m2.data or [])
     all_msgs.sort(key=lambda m: m["created_at"])
+    if len(all_msgs) > limit:
+        all_msgs = all_msgs[-limit:]
 
-    # Mark received messages as read
-    unread_ids = [m["id"] for m in (m2.data or []) if not m["read"]]
+    # Mark received messages in this page as read
+    returned_ids = {m["id"] for m in all_msgs}
+    unread_ids = [
+        m["id"] for m in (m2.data or []) if not m["read"] and m["id"] in returned_ids
+    ]
     if unread_ids:
         try:
             sb.table("messages").update({"read": True}).in_("id", unread_ids).execute()

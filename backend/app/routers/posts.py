@@ -5,7 +5,7 @@ import mimetypes
 import time
 import uuid as _uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 
 from app.communities_util import resolve_community_id
 from app.config import settings
@@ -478,7 +478,11 @@ async def report_post(
 
 @router.get("/{post_id}/comments")
 @limiter.limit("120/minute")
-async def list_comments(request: Request, post_id: UUID):
+async def list_comments(
+    request: Request,
+    post_id: UUID,
+    limit: int = Query(default=50, ge=1, le=100),
+):
     sb = get_supabase()
     _purge_expired_soft_deleted_posts(sb)
     chk = (
@@ -498,6 +502,7 @@ async def list_comments(request: Request, post_id: UUID):
         .select("id,post_id,agent_id,content,upvotes,created_at")
         .eq("post_id", str(post_id))
         .order("created_at", desc=False)
+        .limit(limit)
         .execute()
     )
     rows = res.data or []
