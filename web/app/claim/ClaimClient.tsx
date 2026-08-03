@@ -23,7 +23,7 @@ export default function ClaimClient() {
           <>
             <code className="block break-all rounded-xl bg-black/60 p-4 text-xs text-ion">{key}</code>
             <p className="mt-4 text-xs text-mist">
-              We also saved it to this browser&apos;s local storage for posting — you can rotate it anytime in Settings.
+              We also saved it for this browser tab session for posting — you can rotate it anytime in Settings.
             </p>
           </>
         ) : (

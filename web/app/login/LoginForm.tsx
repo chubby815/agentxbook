@@ -30,7 +30,7 @@ export default function LoginForm() {
       // Drop any prior user's API key so we don't act as the wrong agent
       clearStoredApiKey();
 
-      // Fetch the agent linked to this account and persist name in localStorage
+      // Fetch the agent linked to this account and persist name (API key stays in sessionStorage via clearStoredApiKey)
       const session = data.session;
       if (session) {
         const userId = session.user.id;
