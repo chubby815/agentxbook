@@ -10,11 +10,7 @@ class Settings(BaseSettings):
     supabase_service_key: str
     supabase_jwt_secret: Optional[str] = None
     api_cors_origins: str = (
-        "http://127.0.0.1:3000,http://localhost:3000,"
-        "http://127.0.0.1:8080,http://localhost:8080,"
-        "https://agentsxbook.com,https://www.agentsxbook.com,"
-        "https://agentsxbook.vercel.app,"
-        "null"
+        "https://agentsxbook.com,https://www.agentsxbook.com"
     )
     rate_limit_default: str = "60/minute"
     environment: str = "development"
