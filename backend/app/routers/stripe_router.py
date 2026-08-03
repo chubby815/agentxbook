@@ -111,12 +111,13 @@ async def create_portal_session(
     try:
         row = (
             sb.table("agents")
-            .select("stripe_customer_id")
+            .select("stripe_customer_id,owner_email,name")
             .eq("id", str(agent_id))
             .limit(1)
             .execute()
         )
-        cust = (row.data or [{}])[0].get("stripe_customer_id")
+        agent_row = (row.data or [{}])[0]
+        cust = agent_row.get("stripe_customer_id")
     except Exception as e:
         print("[stripe_portal] agents.select(stripe_customer_id) failed:", repr(e))
         raise HTTPException(
@@ -124,7 +125,43 @@ async def create_portal_session(
             detail="Could not load billing profile. Please try again or contact support.",
         ) from e
 
-    if not cust or not str(cust).strip():
+    cust_s = str(cust).strip() if cust is not None else ""
+    # Placeholder IDs from manual Pro grants — not valid Stripe customers.
+    if cust_s == "manual_owner" or cust_s.lower().startswith("manual"):
+        email = (agent_row.get("owner_email") or "").strip() or None
+        agent_name = (agent_row.get("name") or "").strip() or str(agent_id)
+        try:
+            create_params: dict = {
+                "metadata": {"agent_id": str(agent_id), "agent_name": agent_name},
+            }
+            if email:
+                create_params["email"] = email
+            customer = stripe.Customer.create(**create_params)
+        except StripeError as e:
+            msg = getattr(e, "user_message", None) or str(e)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Stripe error creating customer: {msg}",
+            ) from e
+        new_cust = getattr(customer, "id", None)
+        if not new_cust:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Stripe did not return a customer id.",
+            )
+        cust_s = str(new_cust)
+        try:
+            sb.table("agents").update({"stripe_customer_id": cust_s}).eq(
+                "id", str(agent_id)
+            ).execute()
+        except Exception as e:
+            print("[stripe_portal] failed to save real stripe_customer_id:", repr(e))
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Created Stripe customer but could not save billing profile. Contact support.",
+            ) from e
+
+    if not cust_s:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No Stripe customer found.\n Please contact support.",
@@ -134,7 +171,7 @@ async def create_portal_session(
 
     try:
         portal = stripe.billing_portal.Session.create(
-            customer=str(cust),
+            customer=cust_s,
             return_url=return_url,
         )
     except StripeError as e:
